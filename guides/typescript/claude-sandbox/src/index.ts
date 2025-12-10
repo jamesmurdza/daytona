@@ -4,6 +4,22 @@ import * as dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
+import * as readline from 'readline';
+
+async function processPrompt(prompt: string, sandbox: any): Promise<void> {
+  console.log('Processing your request...');
+  try {
+    const result = await sandbox.process.executeCommand(`
+      echo "${prompt.replace(/"/g, '\\"')}" | npx @anthropic-ai/claude-code -p --dangerously-skip-permissions
+    `);
+    console.log('Claude:', result.result);
+    return result.result;
+  } catch (error) {
+    console.error('Error processing prompt:', error);
+    throw error;
+  }
+}
+
 async function main() {
   // Get the Daytona API key from environment variables
   const apiKey = process.env.DAYTONA_API_KEY;
@@ -27,42 +43,83 @@ async function main() {
         'ANTHROPIC_API_KEY': process.env.SANDBOX_ANTHROPIC_API_KEY || '',
       },
     });
+    const previewLink = await sandbox.getPreviewLink(80);
+    console.log(`Preview link: ${previewLink.url}`);
 
     try {
-      console.log('Installing @anthropic-ai/claude-code locally...');
-      
-      // Install the Claude package locally instead of globally
+      console.log('Installing Claude Code...');
       const installResult = await sandbox.process.executeCommand(`
         npm init -y && \
         npm install @anthropic-ai/claude-code
       `);
       
       if (installResult.exitCode !== 0) {
-        console.error('Error installing @anthropic-ai/claude-code:');
-        console.error('Exit code:', installResult.exitCode);
-        console.error('Output:', installResult.result);
-        
-        // Try to get more detailed error information
-        const npmDebugLog = await sandbox.process.executeCommand('cat npm-debug.log 2>/dev/null || echo "No npm debug log found"');
-        console.error('npm debug log:', npmDebugLog.result);
-        
+        console.error('Error installing Claude Code.');
         process.exit(1);
       }
 
-      // Try to use npx to run the cli
-      console.log('Trying to run with npx...');
-      const result = await sandbox.process.executeCommand(`
-        echo "Create a hello world index.html" | npx @anthropic-ai/claude-code -p --dangerously-skip-permissions
-      `);
+      // Set up readline interface for user input
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        prompt: 'Enter your prompt (or press Ctrl+C to exit): ', 
+      });
+
+      console.log('Claude Code is ready! Type your prompt and press Enter to get a response.');
+      console.log('Press Ctrl+C at any time to exit.');
+
+      // Process user input in a loop
+      const processUserInput = async () => {
+
+        const prompt = await new Promise<string>((resolve) => {
+          rl.question('Enter your prompt (or press Ctrl+C to exit): ', (answer) => {
+            resolve(answer);
+          });
+        });
+
+        if (prompt.trim()) {
+          try {
+            await processPrompt(prompt, sandbox);
+          } catch (error) {
+            console.error('Error:', error);
+          } finally {
+            processUserInput();
+          }
+        } else {
+          processUserInput();
+        }
+      };
       
-      console.log('Output:', result.result);
-      
+      // Start the input processing loop
+      await new Promise<void>((resolve) => {
+        // Handle process exit to ensure cleanup
+        const cleanup = async () => {
+          console.log('Cleaning up...');
+          await sandbox.delete();
+          process.exit(0);
+        };
+
+        // Handle Ctrl+C and process exit
+        process.on('SIGINT', cleanup);
+        process.on('exit', cleanup);
+
+        // Start the input loop
+        const run = async () => {
+          try {
+            await processUserInput();
+          } catch (error) {
+            console.error('Error in input loop:', error);
+            await cleanup();
+          }
+        };
+
+        run();
+      });
     } finally {
-      // Clean up the sandbox
+      // This will be called if there's an error in the main try block
       console.log('Cleaning up...');
       await sandbox.delete();
     }
-    
   } catch (error) {
     console.error('An error occurred:', error);
     process.exit(1);
