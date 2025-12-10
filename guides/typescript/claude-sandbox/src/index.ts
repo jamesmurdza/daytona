@@ -46,15 +46,6 @@ async function main() {
         process.exit(1);
       }
 
-      // List the contents of the claude-code package
-      console.log('Listing @anthropic-ai/claude-code contents...');
-      const lsResult = await sandbox.process.executeCommand('ls -la node_modules/@anthropic-ai/claude-code');
-      console.log('Package contents:', lsResult.result);
-      
-      // Try to find the main entry point
-      const packageJson = await sandbox.process.executeCommand('cat node_modules/@anthropic-ai/claude-code/package.json');
-      console.log('Package.json:', packageJson.result);
-      
       // Try to use npx to run the cli
       console.log('Trying to run with npx...');
       const result = await sandbox.process.executeCommand(`
