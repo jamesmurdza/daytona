@@ -23,6 +23,9 @@ async function main() {
     // Create a new sandbox with node template
     const sandbox = await daytona.create({
       language: 'typescript',
+      envVars: {
+        'ANTHROPIC_API_KEY': process.env.SANDBOX_ANTHROPIC_API_KEY || '',
+      },
     });
 
     try {
