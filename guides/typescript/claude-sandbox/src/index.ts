@@ -6,7 +6,7 @@ import * as readline from 'readline';
 dotenv.config();
 
 async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<void> {
-  console.log('\nProcessing your request...\n');
+  console.log('Processing your request...');
   
   try {
     // Use the Python code interpreter to run Agent SDK code
@@ -63,7 +63,7 @@ async def run_query():
                 elif isinstance(block, ToolUseBlock):
                     print(f"\\n[Tool: {block.name}]")
         elif hasattr(message, 'subtype'):
-            print(f"\\n\\n[Done: {message.subtype}]")
+            print(f"\\n[Done: {message.subtype}]")
 
 asyncio.run(run_query())
 `;
@@ -122,7 +122,7 @@ async function main() {
     const previewLink = await sandbox.getPreviewLink(80);
 
     try {
-      console.log('Installing Python Agent SDK...');
+      console.log('Installing Agent SDK...');
       // Install using process command to ensure it's in the system Python
       const installResult = await sandbox.process.executeCommand(
         'python3 -m pip install claude-agent-sdk'
@@ -134,7 +134,7 @@ async function main() {
       }
 
       // Test that the SDK is available in the code interpreter
-      console.log('Initializing Agent SDK in code interpreter...');
+      console.log('Initializing Agent SDK...');
       // Use a context to maintain state between calls
       const ctx = await sandbox.codeInterpreter.createContext();
       
@@ -160,7 +160,7 @@ client = ClaudeSDKClient(
 )
 
 # Connect the client (this will be awaited in the first query)
-print("Agent SDK ready - continuous conversation enabled")
+print("Agent SDK is ready.")
 `;
       
       const initResult = await sandbox.codeInterpreter.runCode(initCode, {
@@ -180,14 +180,13 @@ print("Agent SDK ready - continuous conversation enabled")
         output: process.stdout,
       });
 
-      console.log('\nAgent SDK is ready! Type your prompt and press Enter.');
-      console.log('Press Ctrl+C at any time to exit.\n');
+      console.log('Press Ctrl+C at any time to exit.');
 
       // Process user input in a loop
       const processUserInput = async (): Promise<void> => {
         try {
           const prompt = await new Promise<string>((resolve) => {
-            rl.question('Enter your prompt: ', (answer) => {
+            rl.question('User: ', (answer) => {
               resolve(answer);
             });
           });
