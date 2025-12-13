@@ -10,30 +10,38 @@ async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<vo
   
   try {
     // Use the Python code interpreter to run Agent SDK code
-    // The code interpreter maintains state between calls, so imports persist
+    // The code interpreter maintains state between calls, so the client persists
     // Use triple quotes to safely handle the prompt string
     const escapedPrompt = prompt.replace(/'''/g, "'''\"'''\"'''");
     const pythonCode = `
 import asyncio
 import sys
-from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, ResultMessage
+from claude_agent_sdk import AssistantMessage, TextBlock, ToolUseBlock
 
 async def run_query():
-    async for message in query(
-        prompt='''${escapedPrompt}''',
-        options=ClaudeAgentOptions(
-            allowed_tools=["Read", "Edit", "Glob", "Grep", "Bash"],
-            permission_mode="acceptEdits"
-        )
-    ):
+    # Connect client if not already connected (connection persists across calls)
+    try:
+        if 'client_connected' not in globals():
+            await client.connect()
+            globals()['client_connected'] = True
+    except Exception as e:
+        # If already connected or other error, continue anyway
+        if 'already' not in str(e).lower() and 'connected' not in str(e).lower():
+            raise
+    
+    # Use the global client that maintains conversation context
+    await client.query('''${escapedPrompt}''')
+    
+    # Process the response
+    async for message in client.receive_response():
         if isinstance(message, AssistantMessage):
             for block in message.content:
-                if hasattr(block, "text"):
+                if isinstance(block, TextBlock):
                     sys.stdout.write(block.text)
                     sys.stdout.flush()
-                elif hasattr(block, "name"):
+                elif isinstance(block, ToolUseBlock):
                     print(f"\\n[Tool: {block.name}]")
-        elif isinstance(message, ResultMessage):
+        elif hasattr(message, 'subtype'):
             print(f"\\n\\n[Done: {message.subtype}]")
 
 asyncio.run(run_query())
@@ -103,25 +111,32 @@ async function main() {
       console.log('Initializing Agent SDK in code interpreter...');
       // Use a context to maintain state between calls
       const ctx = await sandbox.codeInterpreter.createContext();
-      const initResult = await sandbox.codeInterpreter.runCode(
-        'import claude_agent_sdk; print("Agent SDK ready")',
-        {
-          context: ctx,
-          onStdout: (msg: any) => console.log(msg.output),
-          onStderr: (msg: any) => console.error(msg.output),
-        }
-      );
+      
+      // Initialize ClaudeSDKClient for continuous conversation
+      const initCode = `
+import asyncio
+from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+
+# Create a global client instance for continuous conversation
+client = ClaudeSDKClient(
+    options=ClaudeAgentOptions(
+        allowed_tools=["Read", "Edit", "Glob", "Grep", "Bash"],
+        permission_mode="acceptEdits"
+    )
+)
+
+# Connect the client (this will be awaited in the first query)
+print("Agent SDK ready - continuous conversation enabled")
+`;
+      
+      const initResult = await sandbox.codeInterpreter.runCode(initCode, {
+        context: ctx,
+        onStdout: (msg: any) => console.log(msg.output),
+        onStderr: (msg: any) => console.error(msg.output),
+      });
       
       if (initResult.error) {
         console.error('Error initializing Agent SDK:', initResult.error.value);
-        // Try to see what Python the code interpreter is using
-        const debugResult = await sandbox.codeInterpreter.runCode(
-          'import sys; print(f"Python executable: {sys.executable}"); print(f"Python path: {sys.path}")',
-          {
-            context: ctx,
-            onStdout: (msg: any) => console.log(msg.output),
-          }
-        );
         process.exit(1);
       }
 
