@@ -16,7 +16,26 @@ async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<vo
     const pythonCode = `
 import asyncio
 import sys
+import re
 from claude_agent_sdk import AssistantMessage, TextBlock, ToolUseBlock
+
+def render_markdown(text):
+    # ANSI escape codes
+    ESC = chr(27)
+    BOLD = ESC + '[1m'
+    ITALIC = ESC + '[3m'
+    DIM = ESC + '[2m'
+    RESET = ESC + '[0m'
+    
+    # Convert **bold** to ANSI bold (process first)
+    text = re.sub(r'\\*\\*(.+?)\\*\\*', BOLD + r'\\1' + RESET, text)
+    # Convert *italic* to ANSI italic (single asterisks that aren't part of **)
+    # Use negative lookahead/lookbehind to avoid matching **
+    text = re.sub(r'(?<!\\*)\\*([^\\*\\n]+?)\\*(?!\\*)', ITALIC + r'\\1' + RESET, text)
+    # Convert code backticks to ANSI dim
+    backtick = chr(96)
+    text = re.sub(backtick + r'([^' + backtick + r']+?)' + backtick, DIM + r'\\1' + RESET, text)
+    return text
 
 async def run_query():
     # Connect client if not already connected (connection persists across calls)
@@ -37,7 +56,9 @@ async def run_query():
         if isinstance(message, AssistantMessage):
             for block in message.content:
                 if isinstance(block, TextBlock):
-                    sys.stdout.write(block.text)
+                    # Render markdown in the text
+                    rendered = render_markdown(block.text)
+                    sys.stdout.write(rendered)
                     sys.stdout.flush()
                 elif isinstance(block, ToolUseBlock):
                     print(f"\\n[Tool: {block.name}]")
@@ -50,7 +71,13 @@ asyncio.run(run_query())
     const result = await sandbox.codeInterpreter.runCode(pythonCode, {
       context: ctx,
       onStdout: (msg: any) => process.stdout.write(msg.output),
-      onStderr: (msg: any) => process.stderr.write(msg.output),
+      onStderr: (msg: any) => {
+        // Filter out INFO level messages
+        const output = msg.output;
+        //if (!output.includes('INFO:') && !output.includes('Using bundled Claude Code CLI')) {
+          process.stderr.write(output);
+        //}
+      },
     });
 
     if (result.error) {
@@ -93,7 +120,6 @@ async function main() {
       },
     });
     const previewLink = await sandbox.getPreviewLink(80);
-    console.log(`Preview link: ${previewLink.url}`);
 
     try {
       console.log('Installing Python Agent SDK...');
@@ -112,16 +138,24 @@ async function main() {
       // Use a context to maintain state between calls
       const ctx = await sandbox.codeInterpreter.createContext();
       
+      // Escape the preview URL for use in Python string
+      const escapedPreviewUrl = previewLink.url.replace(/'/g, "\\'");
+      
       // Initialize ClaudeSDKClient for continuous conversation
       const initCode = `
 import asyncio
+import logging
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+
+# Suppress INFO level logging from claude_agent_sdk
+logging.getLogger('claude_agent_sdk').setLevel(logging.WARNING)
 
 # Create a global client instance for continuous conversation
 client = ClaudeSDKClient(
     options=ClaudeAgentOptions(
         allowed_tools=["Read", "Edit", "Glob", "Grep", "Bash"],
-        permission_mode="acceptEdits"
+        permission_mode="acceptEdits",
+        system_prompt="You are running in a Daytona sandbox. Your public preview URL for port 80 is: ${escapedPreviewUrl}. This is an example of the preview URL format - when you start services on different ports, they will be accessible at similar preview URLs following the same pattern. For example, a server on port 8000 would be accessible at a preview URL like this one but for port 8000."
     )
 )
 
