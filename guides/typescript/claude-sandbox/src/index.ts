@@ -5,15 +5,61 @@ import * as readline from 'readline';
 // Load environment variables from .env file
 dotenv.config();
 
-async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<void> {
-  console.log('Processing your request...');
-  
-  try {
-    // Use the Python code interpreter to run Agent SDK code
-    // The code interpreter maintains state between calls, so the client persists
-    // Any other cell: await client.query("Your prompt")
-    // In Jupyter notebooks: await client.query("Your prompt") works directly
-    const pythonCode = `
+const INIT_PYTHON_CODE = `
+import os
+import logging
+from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+
+# Suppress INFO level logging from claude_agent_sdk
+logging.getLogger('claude_agent_sdk').setLevel(logging.WARNING)
+
+# Get the preview URL from environment variable
+preview_url = os.environ.get('PREVIEW_URL', '')
+
+# Create a global client instance for continuous conversation
+client = ClaudeSDKClient(
+    options=ClaudeAgentOptions(
+        allowed_tools=["Read", "Edit", "Glob", "Grep", "Bash"],
+        permission_mode="acceptEdits",
+        system_prompt=f"You are running in a Daytona sandbox. Your public preview URL for port 80 is: {preview_url}. This is an example of the preview URL format - when you start services on different ports, they will be accessible at similar preview URLs following the same pattern. For example, a server on port 8000 would be accessible at a preview URL like this one but for port 8000."
+    )
+)
+
+# Enter the async context manager
+# In Jupyter notebooks, use: await client.__aenter__()
+# For code interpreter context, wrap in async function
+async def _init_client():
+    await client.__aenter__()
+    print("Agent SDK is ready.")
+
+# Execute the async function (code interpreter doesn't support top-level await)
+# In Jupyter notebooks, use: await client.__aenter__() directly
+import asyncio
+try:
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        # If loop is already running, try nest_asyncio
+        try:
+            import nest_asyncio
+            nest_asyncio.apply()
+            loop.run_until_complete(_init_client())
+        except ImportError:
+            # nest_asyncio not available, create new event loop
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            new_loop.run_until_complete(_init_client())
+            new_loop.close()
+    else:
+        loop.run_until_complete(_init_client())
+except RuntimeError:
+    # No event loop, create a new one
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_init_client())
+    loop.close()
+`;
+
+const QUERY_PYTHON_CODE = `
 import sys
 import os
 import re
@@ -87,7 +133,11 @@ except RuntimeError:
     loop.close()
 `;
 
-    const result = await sandbox.codeInterpreter.runCode(pythonCode, {
+async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<void> {
+  console.log('Processing your request...');
+  
+  try {
+    const result = await sandbox.codeInterpreter.runCode(QUERY_PYTHON_CODE, {
       context: ctx,
       envs: {
         PROMPT: prompt,
@@ -158,61 +208,7 @@ async function main() {
       // Cell 1: Initialize once. Enter once. Reuse everywhere.
       // For Jupyter notebooks: Use top-level await: await client.__aenter__()
       // For code interpreter: We wrap it to work without top-level await
-      const initCode = `
-import os
-import logging
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
-
-# Suppress INFO level logging from claude_agent_sdk
-logging.getLogger('claude_agent_sdk').setLevel(logging.WARNING)
-
-# Get the preview URL from environment variable
-preview_url = os.environ.get('PREVIEW_URL', '')
-
-# Create a global client instance for continuous conversation
-client = ClaudeSDKClient(
-    options=ClaudeAgentOptions(
-        allowed_tools=["Read", "Edit", "Glob", "Grep", "Bash"],
-        permission_mode="acceptEdits",
-        system_prompt=f"You are running in a Daytona sandbox. Your public preview URL for port 80 is: {preview_url}. This is an example of the preview URL format - when you start services on different ports, they will be accessible at similar preview URLs following the same pattern. For example, a server on port 8000 would be accessible at a preview URL like this one but for port 8000."
-    )
-)
-
-# Enter the async context manager
-# In Jupyter notebooks, use: await client.__aenter__()
-# For code interpreter context, wrap in async function
-async def _init_client():
-    await client.__aenter__()
-    print("Agent SDK is ready.")
-
-# Execute the async function (code interpreter doesn't support top-level await)
-# In Jupyter notebooks, use: await client.__aenter__() directly
-import asyncio
-try:
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        # If loop is already running, try nest_asyncio
-        try:
-            import nest_asyncio
-            nest_asyncio.apply()
-            loop.run_until_complete(_init_client())
-        except ImportError:
-            # nest_asyncio not available, create new event loop
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            new_loop.run_until_complete(_init_client())
-            new_loop.close()
-    else:
-        loop.run_until_complete(_init_client())
-except RuntimeError:
-    # No event loop, create a new one
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(_init_client())
-    loop.close()
-`;
-      
-      const initResult = await sandbox.codeInterpreter.runCode(initCode, {
+      const initResult = await sandbox.codeInterpreter.runCode(INIT_PYTHON_CODE, {
         context: ctx,
         envs: {
           PREVIEW_URL: previewLink.url,
