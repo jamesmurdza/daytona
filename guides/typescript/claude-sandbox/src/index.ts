@@ -186,7 +186,20 @@ async function main() {
       const processUserInput = async (): Promise<void> => {
         try {
           const prompt = await new Promise<string>((resolve) => {
+            // If the user presses Ctrl+C while readline is waiting, readline emits a 'SIGINT'
+            // event (it does not necessarily let the process-level SIGINT handler run). We
+            // attach a one-time listener that runs our cleanup and prevents the question
+            // callback from hanging.
+            const onReadlineSigint = () => {
+              // Cleanup will exit the process; don't try to resolve the prompt here.
+              cleanup(0).catch((e) => console.error('Cleanup failed:', e));
+            };
+
+            rl.once('SIGINT', onReadlineSigint);
+
             rl.question('User: ', (answer) => {
+              // If we got an answer, remove our SIGINT handler and resolve normally.
+              rl.removeListener('SIGINT', onReadlineSigint);
               resolve(answer);
             });
           });
@@ -212,20 +225,44 @@ async function main() {
         }
       };
       
-      // Handle cleanup
-      const cleanup = async () => {
+      // Handle cleanup — make idempotent so multiple signals don't race
+      let cleanedUp = false;
+      const cleanup = async (exitCode = 0) => {
+        if (cleanedUp) return;
+        cleanedUp = true;
         console.log('\n\nCleaning up...');
-        rl.close();
+
         try {
-          await sandbox.delete();
+          // Close readline if still open
+          try {
+            rl.close();
+          } catch (err) {
+            // ignore
+          }
+
+          // Try deleting the sandbox, but don't hang forever
+          const deletePromise = sandbox.delete();
+          const timeout = new Promise((resolve) => setTimeout(resolve, 5000));
+          await Promise.race([deletePromise, timeout]);
         } catch (error) {
           console.error('Error during cleanup:', error);
+        } finally {
+          // Use setImmediate to allow stdout to flush
+          setImmediate(() => process.exit(exitCode));
         }
-        process.exit(0);
       };
 
-      // Handle Ctrl+C
-      process.on('SIGINT', cleanup);
+      // Handle signals — ensure cleanup runs for SIGINT (Ctrl+C) and SIGTERM
+      const onSignal = (signal: string) => {
+        console.log(`\nReceived ${signal}`);
+        cleanup(0).catch((e) => console.error('Cleanup failed:', e));
+      };
+
+      process.on('SIGINT', () => onSignal('SIGINT'));
+      process.on('SIGTERM', () => onSignal('SIGTERM'));
+
+      // (Note: uncaughtException/unhandledRejection handlers removed —
+      // keep global error handling elsewhere if desired.)
 
       // Start the input loop
       await processUserInput();
