@@ -11,8 +11,9 @@ async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<vo
   try {
     // Use the Python code interpreter to run Agent SDK code
     // The code interpreter maintains state between calls, so the client persists
+    // Any other cell: await client.query("Your prompt")
+    // In Jupyter notebooks: await client.query("Your prompt") works directly
     const pythonCode = `
-import asyncio
 import sys
 import os
 import re
@@ -36,21 +37,13 @@ def render_markdown(text):
     text = re.sub(backtick + r'([^' + backtick + r']+?)' + backtick, DIM + r'\\1' + RESET, text)
     return text
 
-async def run_query():
-    # Connect client if not already connected (connection persists across calls)
-    try:
-        if 'client_connected' not in globals():
-            await client.connect()
-            globals()['client_connected'] = True
-    except Exception as e:
-        # If already connected or other error, continue anyway
-        if 'already' not in str(e).lower() and 'connected' not in str(e).lower():
-            raise
-    
-    # Get the prompt from environment variable
-    prompt = os.environ.get('PROMPT', '')
-    
-    # Use the global client that maintains conversation context
+# Get the prompt from environment variable
+prompt = os.environ.get('PROMPT', '')
+
+# Use the global client that maintains conversation context
+# In Jupyter notebooks, use: await client.query(prompt)
+# For code interpreter context, wrap in async function
+async def _run_query():
     await client.query(prompt)
     
     # Process the response
@@ -67,7 +60,31 @@ async def run_query():
         elif hasattr(message, 'subtype'):
             print(f"\\n[Done: {message.subtype}]")
 
-asyncio.run(run_query())
+# Execute the async function (code interpreter doesn't support top-level await)
+# In Jupyter notebooks, use: await client.query(prompt) directly
+import asyncio
+try:
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        # If loop is already running, try nest_asyncio
+        try:
+            import nest_asyncio
+            nest_asyncio.apply()
+            loop.run_until_complete(_run_query())
+        except ImportError:
+            # nest_asyncio not available, create new event loop
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            new_loop.run_until_complete(_run_query())
+            new_loop.close()
+    else:
+        loop.run_until_complete(_run_query())
+except RuntimeError:
+    # No event loop, create a new one
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_run_query())
+    loop.close()
 `;
 
     const result = await sandbox.codeInterpreter.runCode(pythonCode, {
@@ -138,8 +155,10 @@ async function main() {
       const ctx = await sandbox.codeInterpreter.createContext();
       
       // Initialize ClaudeSDKClient for continuous conversation
+      // Cell 1: Initialize once. Enter once. Reuse everywhere.
+      // For Jupyter notebooks: Use top-level await: await client.__aenter__()
+      // For code interpreter: We wrap it to work without top-level await
       const initCode = `
-import asyncio
 import os
 import logging
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
@@ -159,8 +178,38 @@ client = ClaudeSDKClient(
     )
 )
 
-# Connect the client (this will be awaited in the first query)
-print("Agent SDK is ready.")
+# Enter the async context manager
+# In Jupyter notebooks, use: await client.__aenter__()
+# For code interpreter context, wrap in async function
+async def _init_client():
+    await client.__aenter__()
+    print("Agent SDK is ready.")
+
+# Execute the async function (code interpreter doesn't support top-level await)
+# In Jupyter notebooks, use: await client.__aenter__() directly
+import asyncio
+try:
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        # If loop is already running, try nest_asyncio
+        try:
+            import nest_asyncio
+            nest_asyncio.apply()
+            loop.run_until_complete(_init_client())
+        except ImportError:
+            # nest_asyncio not available, create new event loop
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            new_loop.run_until_complete(_init_client())
+            new_loop.close()
+    else:
+        loop.run_until_complete(_init_client())
+except RuntimeError:
+    # No event loop, create a new one
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_init_client())
+    loop.close()
 `;
       
       const initResult = await sandbox.codeInterpreter.runCode(initCode, {
