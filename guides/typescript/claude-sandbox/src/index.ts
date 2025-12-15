@@ -11,11 +11,10 @@ async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<vo
   try {
     // Use the Python code interpreter to run Agent SDK code
     // The code interpreter maintains state between calls, so the client persists
-    // Use triple quotes to safely handle the prompt string
-    const escapedPrompt = prompt.replace(/'''/g, "'''\"'''\"'''");
     const pythonCode = `
 import asyncio
 import sys
+import os
 import re
 from claude_agent_sdk import AssistantMessage, TextBlock, ToolUseBlock
 
@@ -48,8 +47,11 @@ async def run_query():
         if 'already' not in str(e).lower() and 'connected' not in str(e).lower():
             raise
     
+    # Get the prompt from environment variable
+    prompt = os.environ.get('PROMPT', '')
+    
     # Use the global client that maintains conversation context
-    await client.query('''${escapedPrompt}''')
+    await client.query(prompt)
     
     # Process the response
     async for message in client.receive_response():
@@ -70,6 +72,9 @@ asyncio.run(run_query())
 
     const result = await sandbox.codeInterpreter.runCode(pythonCode, {
       context: ctx,
+      envs: {
+        PROMPT: prompt,
+      },
       onStdout: (msg: any) => process.stdout.write(msg.output),
       onStderr: (msg: any) => {
         // Filter out INFO level messages
@@ -138,24 +143,25 @@ async function main() {
       // Use a context to maintain state between calls
       const ctx = await sandbox.codeInterpreter.createContext();
       
-      // Escape the preview URL for use in Python string
-      const escapedPreviewUrl = previewLink.url.replace(/'/g, "\\'");
-      
       // Initialize ClaudeSDKClient for continuous conversation
       const initCode = `
 import asyncio
+import os
 import logging
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
 
 # Suppress INFO level logging from claude_agent_sdk
 logging.getLogger('claude_agent_sdk').setLevel(logging.WARNING)
 
+# Get the preview URL from environment variable
+preview_url = os.environ.get('PREVIEW_URL', '')
+
 # Create a global client instance for continuous conversation
 client = ClaudeSDKClient(
     options=ClaudeAgentOptions(
         allowed_tools=["Read", "Edit", "Glob", "Grep", "Bash"],
         permission_mode="acceptEdits",
-        system_prompt="You are running in a Daytona sandbox. Your public preview URL for port 80 is: ${escapedPreviewUrl}. This is an example of the preview URL format - when you start services on different ports, they will be accessible at similar preview URLs following the same pattern. For example, a server on port 8000 would be accessible at a preview URL like this one but for port 8000."
+        system_prompt=f"You are running in a Daytona sandbox. Your public preview URL for port 80 is: {preview_url}. This is an example of the preview URL format - when you start services on different ports, they will be accessible at similar preview URLs following the same pattern. For example, a server on port 8000 would be accessible at a preview URL like this one but for port 8000."
     )
 )
 
@@ -165,6 +171,9 @@ print("Agent SDK is ready.")
       
       const initResult = await sandbox.codeInterpreter.runCode(initCode, {
         context: ctx,
+        envs: {
+          PREVIEW_URL: previewLink.url,
+        },
         onStdout: (msg: any) => console.log(msg.output),
         onStderr: (msg: any) => console.error(msg.output),
       });
