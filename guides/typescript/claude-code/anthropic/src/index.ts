@@ -1,13 +1,26 @@
-import { Daytona, Sandbox } from '@daytonaio/sdk'
+import { Daytona } from '@daytonaio/sdk'
 import * as dotenv from 'dotenv'
 import * as readline from 'readline'
-import * as fs from 'fs'
-import * as path from 'path'
 
 // Load environment variables from .env file
 dotenv.config()
 
-// Function to run the coding agent in the sandbox with the given prompt
+// Constants for ANSI escape codes
+const ESC = '\u001b';
+const BOLD = ESC + '[1m';
+const ITALIC = ESC + '[3m';
+const DIM = ESC + '[2m';
+const RESET = ESC + '[0m';
+
+// Function to render markdown to ANSI
+function renderMarkdown(text: string): string {
+  // Apply bold, italic, and dim styles
+  return text
+    .replace(/\*\*(.+?)\*\*/g, `${BOLD}$1${RESET}`)    // **bold**
+    .replace(/(?<!\*)\*([^\*\n]+?)\*(?!\*)/g, `${ITALIC}$1${RESET}`) // *italic*
+    .replace(/`([^`]+?)`/g, `${DIM}$1${RESET}`);        // `code`
+}
+
 async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<void> {
   console.log('Processing your request...')
 
@@ -17,8 +30,8 @@ async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<vo
       envs: {
         PROMPT: prompt,
       },
-      onStdout: (msg: any) => process.stdout.write(msg.output),
-      onStderr: (msg: any) => process.stdout.write(msg.output),
+      onStdout: (msg: any) => process.stdout.write(renderMarkdown(msg.output)), // Use renderMarkdown for stdout
+      onStderr: (msg: any) => process.stdout.write(renderMarkdown(msg.output)), // Use renderMarkdown for stderr
     })
 
     if (result.error) {
@@ -184,8 +197,6 @@ async function main() {
       process.on('SIGINT', () => onSignal('SIGINT'))
       process.on('SIGTERM', () => onSignal('SIGTERM'))
 
-      // (Note: uncaughtException/unhandledRejection handlers removed —
-      // keep global error handling elsewhere if desired.)
 
       // Start the input loop
       await processUserInput()
@@ -207,3 +218,5 @@ async function main() {
 }
 
 main().catch(console.error)
+
+

@@ -8,19 +8,6 @@ from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessa
 # Suppress INFO level logging from claude_agent_sdk
 logging.getLogger('claude_agent_sdk').setLevel(logging.WARNING)
 
-# Render markdown to simple ANSI for terminal display
-def render_markdown(text):
-  ESC = chr(27)
-  BOLD = ESC + '[1m'
-  ITALIC = ESC + '[3m'
-  DIM = ESC + '[2m'
-  RESET = ESC + '[0m'
-  text = re.sub(r'\*\*(.+?)\*\*', BOLD + r'\1' + RESET, text)
-  text = re.sub(r'(?<!\*)\*([^\*\n]+?)\*(?!\*)', ITALIC + r'\1' + RESET, text)
-  backtick = chr(96)
-  text = re.sub(backtick + r'([^' + backtick + r']+?)' + backtick, DIM + r'\1' + RESET, text)
-  return text
-
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
@@ -49,7 +36,7 @@ async def init_client():
   await client.__aenter__()
   print("Agent SDK is ready.")
 
-# Async query runner: uses the global client and the render_markdown helper
+# Async query runner: uses the global client
 async def run_query(prompt):
   await client.query(prompt)
   # Process the response
@@ -58,7 +45,7 @@ async def run_query(prompt):
       for block in message.content:
         if isinstance(block, TextBlock):
           # Render markdown in the text
-          rendered = render_markdown(block.text)
+          rendered = block.text
           sys.stdout.write(rendered)
           sys.stdout.flush()
         elif isinstance(block, ToolUseBlock):
@@ -69,5 +56,5 @@ async def run_query(prompt):
 def run_query_sync(prompt):
   return run_sync(run_query(prompt))
 
-# Initialize the client once (use run_sync for compatibility with running event loops)
+# Initialize the client once
 run_sync(init_client())
