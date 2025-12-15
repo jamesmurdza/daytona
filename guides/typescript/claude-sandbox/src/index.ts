@@ -35,6 +35,9 @@ def render_markdown(text):
   text = re.sub(backtick + r'([^' + backtick + r']+?)' + backtick, DIM + r'\\1' + RESET, text)
   return text
 
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 # Helper: run an async coro from synchronous context in a robust way
 def run_coro(coro):
   try:
