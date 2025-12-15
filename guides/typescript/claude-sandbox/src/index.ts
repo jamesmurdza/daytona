@@ -100,22 +100,12 @@ async def run_query(prompt):
 run_coro(_init_client())
 `;
 
-const QUERY_PYTHON_CODE = `
-import os
-
-# Get the prompt from environment variable
-prompt = os.environ.get('PROMPT', '')
-
-# Call the shared run_query helper defined in the initialized context
-# run_coro and run_query are defined in INIT_PYTHON_CODE and available in the same context
-run_coro(run_query(prompt))
-`;
-
 async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<void> {
   console.log('Processing your request...');
   
   try {
-    const result = await sandbox.codeInterpreter.runCode(QUERY_PYTHON_CODE, {
+    const result = await sandbox.codeInterpreter.runCode(
+      `run_coro(run_query(os.environ.get('PROMPT', '')))`, {
       context: ctx,
       envs: {
         PROMPT: prompt,
