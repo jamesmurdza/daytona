@@ -39,28 +39,9 @@ def render_markdown(text):
 def run_coro(coro):
   try:
     loop = asyncio.get_event_loop()
-    if loop.is_running():
-      # If loop is running (e.g., Jupyter), try nest_asyncio to allow run_until_complete
-      try:
-        import nest_asyncio
-        nest_asyncio.apply()
-        return loop.run_until_complete(coro)
-      except ImportError:
-        # nest_asyncio not available: create a new event loop for this call
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
-        res = new_loop.run_until_complete(coro)
-        new_loop.close()
-        return res
-    else:
-      return loop.run_until_complete(coro)
+    return loop.run_until_complete(coro)
   except RuntimeError:
-    # No event loop, create a new one
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    res = loop.run_until_complete(coro)
-    loop.close()
-    return res
+    print("NO EVENT LOOP FOUND")
 
 # Get the preview URL from environment variable
 preview_url = os.environ.get('PREVIEW_URL', '')
