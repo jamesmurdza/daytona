@@ -22,7 +22,7 @@ function renderMarkdown(text: string): string {
 }
 
 async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<void> {
-  console.log('Processing your request...')
+  console.log('Thinking...')
 
   try {
     const result = await sandbox.codeInterpreter.runCode(`coding_agent.run_query_sync(os.environ.get('PROMPT', ''))`, {
