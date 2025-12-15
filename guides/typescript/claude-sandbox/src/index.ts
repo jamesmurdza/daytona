@@ -76,13 +76,7 @@ asyncio.run(run_query())
         PROMPT: prompt,
       },
       onStdout: (msg: any) => process.stdout.write(msg.output),
-      onStderr: (msg: any) => {
-        // Filter out INFO level messages
-        const output = msg.output;
-        //if (!output.includes('INFO:') && !output.includes('Using bundled Claude Code CLI')) {
-          process.stderr.write(output);
-        //}
-      },
+      onStderr: (msg: any) => process.stdout.write(msg.output),
     });
 
     if (result.error) {
