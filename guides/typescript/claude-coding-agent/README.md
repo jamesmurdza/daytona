@@ -90,6 +90,6 @@ See the main project LICENSE file for details.
 
 ## References
 
-- [Agent SDK Overview](https://platform.claude.com/docs/en/agent-sdk/overview)
-- [Agent SDK Reference—Python](https://platform.claude.com/docs/en/agent-sdk/python)
+- [Claude Agent SDK Overview](https://platform.claude.com/docs/en/agent-sdk/overview)
+- [Claude Agent SDK Reference (Python)](https://platform.claude.com/docs/en/agent-sdk/python)
 - [Daytona Documentation](https://www.daytona.io/docs)
