@@ -23,6 +23,7 @@ asyncio.set_event_loop(loop)
 # Generate a system prompt for the agent
 system_prompt = """
 You are running in a Daytona sandbox.
+Use the /home/daytona directory instead of /workspace for file operations.
 Your public preview URL for port 80 is: {}.
 This is an example of the preview URL format.
 When you start other services, they will follow the same pattern on other ports.
