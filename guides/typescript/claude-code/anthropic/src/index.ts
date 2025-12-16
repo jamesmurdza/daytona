@@ -4,22 +4,7 @@ import * as readline from 'readline'
 
 // Load environment variables from .env file
 dotenv.config()
-
-// Constants for ANSI escape codes
-const ESC = '\u001b';
-const BOLD = ESC + '[1m';
-const ITALIC = ESC + '[3m';
-const DIM = ESC + '[2m';
-const RESET = ESC + '[0m';
-
-// Function to render markdown to ANSI
-function renderMarkdown(text: string): string {
-  // Apply bold, italic, and dim styles
-  return text
-    .replace(/\*\*(.+?)\*\*/g, `${BOLD}$1${RESET}`)    // **bold**
-    .replace(/(?<!\*)\*([^\*\n]+?)\*(?!\*)/g, `${ITALIC}$1${RESET}`) // *italic*
-    .replace(/`([^`]+?)`/g, `${DIM}$1${RESET}`);        // `code`
-}
+import { renderMarkdown } from './utils'
 
 async function processPrompt(prompt: string, sandbox: any, ctx: any): Promise<void> {
   console.log('Thinking...')
