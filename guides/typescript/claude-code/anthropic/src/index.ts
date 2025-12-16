@@ -72,8 +72,8 @@ async function main() {
     // Set up readline interface for user input
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
     rl.on('SIGINT', async () => {
-      console.log('\nExiting...')
       try {
+      console.log('\nCleaning up...')
         await sandbox.delete()
       } catch (e) {
         console.error('Error deleting sandbox:', e)
