@@ -54,22 +54,34 @@ When you run the example, the agent follows this workflow:
 
 ```
 Creating sandbox...
-Installing @anthropic-ai/claude-code...
-Running Claude command...
-Output: Created hello world index.html with the following content:
+Installing Agent SDK...
+Initializing Agent SDK...
+Press Ctrl+C at any time to exit.
+User: make a lunar lander web app
+Thinking...
+I'll help you create a lunar lander web app! This is a fun game where players control a lunar module trying to land safely on the moon's surface. Let me plan the implementation first to make sure we build something great.
+🔨 EnterPlanMode
+Let me create a lunar lander web app for you! I'll build a complete game with:
+- Physics simulation (gravity, thrust, velocity)
+- Canvas-based graphics
+- Keyboard controls (arrow keys for thrust)
+- Landing detection (safe vs crash)
+- Fuel management
+- Visual feedback and game states
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Hello World</title>
-</head>
-<body>
-    <h1>Hello, World!</h1>
-    <p>Welcome to my first webpage.</p>
-</body>
-</html>
+Let me start by creating the necessary files:
+> 🔨 Write
+🔨 Write
+> 🔨 Write
+...
+Perfect! The web server is now running successfully. 🚀
 
-Cleaning up...
+Your Lunar Lander game is live at:
+🌐 https://80-17ac1c0f-d684-4122-93b5-8f52fd5393f8.proxy.daytona.works
+
+The server is serving the files from /home/daytona/. Click the link above to start playing!
+
+Objective: Land gently on the green platform with safe speeds. Good luck! 🌙
 ```
 
 ## License
