@@ -19,11 +19,13 @@ This example demonstrates how to create a TypeScript sandbox that runs Claude co
 ## Setup
 
 1. Install dependencies:
+
    ```bash
    npm install
    ```
 
 2. Create a `.env` file in the project root and add your Daytona API key:
+
    ```
    DAYTONA_API_KEY=your_daytona_api_key_here
    ```
@@ -37,6 +39,7 @@ npm start
 ```
 
 This will:
+
 1. Create a new sandbox
 2. Install `@anthropic-ai/claude-code`
 3. Execute a simple Claude command to generate an `index.html` file
