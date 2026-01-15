@@ -19,7 +19,7 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@daytonaio/sdk": "^0.28.8",
+    "@daytonaio/sdk": "^0.130.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
