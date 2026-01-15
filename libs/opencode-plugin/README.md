@@ -1,13 +1,13 @@
-# opencode-daytona
+# @jamesmurdza/opencode-daytona
 
 An OpenCode plugin that automatically runs all your OpenCode sessions in Daytona sandboxes. This provides isolated, reproducible development environments for your AI coding sessions.
 
 ## Installation
 
 ```bash
-npm install -g opencode-daytona
+npm install -g @jamesmurdza/opencode-daytona
 # or
-bun add -g opencode-daytona
+bun add -g @jamesmurdza/opencode-daytona
 ```
 
 ## Usage
@@ -17,7 +17,7 @@ Add the plugin to your `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-daytona"]
+  "plugin": ["@jamesmurdza/opencode-daytona"]
 }
 ```
 
