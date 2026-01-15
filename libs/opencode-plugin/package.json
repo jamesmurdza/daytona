@@ -1,6 +1,6 @@
 {
   "name": "@jamesmurdza/opencode-daytona",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "OpenCode plugin that automatically runs all sessions in Daytona sandboxes for isolated, reproducible development environments",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
