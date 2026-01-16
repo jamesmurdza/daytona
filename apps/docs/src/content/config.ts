@@ -441,6 +441,15 @@ export const getSidebarConfig = (
         },
         {
           type: 'link',
+          href: localizePath('/docs/opencode-web-agent', locale),
+          label: labels['sidebarconfig.opencode'],
+          disablePagination: true,
+          attrs: {
+            icon: 'opencode.svg',
+          },
+        },
+        {
+          type: 'link',
           href: localizePath('/docs/langchain-data-analysis', locale),
           label: labels['sidebarconfig.langchainIntegrations'],
           disablePagination: true,
