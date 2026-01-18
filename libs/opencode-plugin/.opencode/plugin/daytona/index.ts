@@ -19,6 +19,8 @@
  */
 
 import { join } from "path";
+import { tmpdir } from "os";
+import { xdgData } from "xdg-basedir";
 import type { Plugin } from "@opencode-ai/plugin";
 
 // Import modules
@@ -33,9 +35,9 @@ import {
 // Export types for consumers
 export type { EventSessionDeleted, LogLevel, SandboxInfo, SessionInfo, ProjectSessionData } from "./types";
 
-// Initialize logger and session manager
-const LOG_FILE = join(process.env.HOME || '/tmp', '.daytona-plugin.log');
-const STORAGE_DIR = join(process.env.HOME || '/tmp', '.local/share/opencode/storage/daytona');
+// Initialize logger and session manager using xdg-basedir (same as OpenCode)
+const LOG_FILE = join(tmpdir(), '.daytona-plugin.log');
+const STORAGE_DIR = join(xdgData!, 'opencode', 'storage', 'daytona');
 
 const logger = new Logger(LOG_FILE);
 const sessionManager = new DaytonaSessionManager(
