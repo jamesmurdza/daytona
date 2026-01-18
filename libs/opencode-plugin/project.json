@@ -12,6 +12,14 @@
         "main": "libs/opencode-plugin/src/index.ts",
         "tsConfig": "libs/opencode-plugin/tsconfig.json"
       }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "libs/opencode-plugin/dist",
+        "command": "npm publish --access public --registry https://registry.npmjs.org/"
+      },
+      "dependsOn": ["build"]
     }
   },
   "tags": []
