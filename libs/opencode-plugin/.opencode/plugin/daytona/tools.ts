@@ -7,7 +7,11 @@ import type { ToolContext } from "@opencode-ai/plugin";
 import type { FileInfo } from "@daytonaio/sdk";
 import type { DaytonaSessionManager } from "./session-manager";
 
-export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
+export function createDaytonaTools(
+  sessionManager: DaytonaSessionManager,
+  projectId: string,
+  worktree: string
+) {
   return {
     /**
      * Executes a shell command in the Daytona sandbox and returns the output
@@ -22,7 +26,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
       },
       async execute(args: { command: string; background?: boolean }, ctx: ToolContext) {
         const sessionId = ctx.sessionID;
-        const sandbox = await sessionManager.getSandbox(sessionId);
+        const sandbox = await sessionManager.getSandbox(sessionId, projectId, worktree);
         
         if (args.background) {
           // Run command in background using session-based execution
@@ -59,7 +63,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         filePath: z.string(),
       },
       async execute(args: { filePath: string }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         const buffer = await sandbox.fs.downloadFile(args.filePath);
         const decoder = new TextDecoder();
         return decoder.decode(buffer);
@@ -78,7 +82,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         content: z.string(),
       },
       async execute(args: { filePath: string; content: string }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         await sandbox.fs.uploadFile(Buffer.from(args.content), args.filePath);
         return `Written ${args.content.length} bytes to ${args.filePath}`;
       },
@@ -98,7 +102,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         newString: z.string(),
       },
       async execute(args: { filePath: string; oldString: string; newString: string }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         const buffer = await sandbox.fs.downloadFile(args.filePath);
         const decoder = new TextDecoder();
         const content = decoder.decode(buffer);
@@ -125,7 +129,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         ),
       },
       async execute(args: { filePath: string; edits: Array<{ oldString: string; newString: string }> }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         const buffer = await sandbox.fs.downloadFile(args.filePath);
         const decoder = new TextDecoder();
         let content = decoder.decode(buffer);
@@ -153,7 +157,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         newSnippet: z.string(),
       },
       async execute(args: { filePath: string; oldSnippet: string; newSnippet: string }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         const buffer = await sandbox.fs.downloadFile(args.filePath);
         const decoder = new TextDecoder();
         const content = decoder.decode(buffer);
@@ -173,7 +177,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         dirPath: z.string().optional(),
       },
       async execute(args: { dirPath?: string }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         const workDir = await sandbox.getWorkDir();
         const path = args.dirPath || workDir;
         const files = await sandbox.fs.listFiles(path) as FileInfo[];
@@ -191,7 +195,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         pattern: z.string(),
       },
       async execute(args: { pattern: string }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         const workDir = await sandbox.getWorkDir();
         const result = await sandbox.fs.searchFiles(workDir, args.pattern);
         return result.files.join('\n');
@@ -208,7 +212,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         pattern: z.string(),
       },
       async execute(args: { pattern: string }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         const workDir = await sandbox.getWorkDir();
         const matches = await sandbox.fs.findFiles(workDir, args.pattern);
         return matches.map((m) => `${m.file}:${m.line}: ${m.content}`).join('\n');
@@ -243,7 +247,7 @@ export function createDaytonaTools(sessionManager: DaytonaSessionManager) {
         port: z.number(),
       },
       async execute(args: { port: number }, ctx: ToolContext) {
-        const sandbox = await sessionManager.getSandbox(ctx.sessionID);
+        const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree);
         const previewLink = await sandbox.getPreviewLink(args.port);
         return `Sandbox Preview URL: ${previewLink.url}`;
       },

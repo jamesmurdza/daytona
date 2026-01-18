@@ -25,6 +25,18 @@ export type SandboxInfo = {
   id: string;
 };
 
+export type SessionInfo = {
+  sandboxId: string;
+  created: number;
+  lastAccessed: number;
+};
+
+export type ProjectSessionData = {
+  projectId: string;
+  worktree: string;
+  sessions: Record<string, SessionInfo>;
+};
+
 export type SessionSandboxMap = Map<string, Sandbox | SandboxInfo>;
 
 // Daytona plugin constants

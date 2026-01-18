@@ -31,16 +31,16 @@ import {
 } from "./plugins";
 
 // Export types for consumers
-export type { EventSessionDeleted, LogLevel, SandboxInfo } from "./types";
+export type { EventSessionDeleted, LogLevel, SandboxInfo, SessionInfo, ProjectSessionData } from "./types";
 
 // Initialize logger and session manager
 const LOG_FILE = join(process.env.HOME || '/tmp', '.daytona-plugin.log');
-const SESSION_MAP_FILE = join(process.env.HOME || '/tmp', '.daytona-sessions.json');
+const STORAGE_DIR = join(process.env.HOME || '/tmp', '.local/share/opencode/storage/daytona');
 
 const logger = new Logger(LOG_FILE);
 const sessionManager = new DaytonaSessionManager(
   process.env.DAYTONA_API_KEY || '',
-  SESSION_MAP_FILE,
+  STORAGE_DIR,
   logger
 );
 

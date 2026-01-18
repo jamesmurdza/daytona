@@ -19,8 +19,11 @@ export function createCustomToolsPlugin(
 ): Plugin {
   return async (pluginCtx: PluginInput) => {
     logger.info('OpenCode started with Daytona plugin');
+    const projectId = pluginCtx.project.id;
+    const worktree = pluginCtx.project.worktree;
+    
     return {
-      tool: createDaytonaTools(sessionManager),
+      tool: createDaytonaTools(sessionManager, projectId, worktree),
     };
   };
 }
@@ -32,7 +35,9 @@ export function createCustomToolsPlugin(
 export function createSessionCleanupPlugin(
   sessionManager: DaytonaSessionManager
 ): Plugin {
-  return async ({ $ }) => {
+  return async (pluginCtx: PluginInput) => {
+    const projectId = pluginCtx.project.id;
+    
     return {
       /**
        * Cleans up sandbox resources when a session is deleted
@@ -40,7 +45,7 @@ export function createSessionCleanupPlugin(
       event: async ({ event }) => {
         if (event.type === EVENT_TYPE_SESSION_DELETED) {
           const sessionId = (event as EventSessionDeleted).properties.info.id;
-          await sessionManager.deleteSandbox(sessionId);
+          await sessionManager.deleteSandbox(sessionId, projectId);
         }
       },
     };

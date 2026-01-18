@@ -1,83 +1,153 @@
 /**
  * Manages Daytona sandbox sessions and persists session-sandbox mappings
+ * Stores data per-project in ~/.local/share/opencode/storage/daytona/{projectId}.json
  */
 
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { join, dirname } from "path";
 import { Daytona, type Sandbox } from "@daytonaio/sdk";
 import type { Logger } from "./logger";
-import type { SandboxInfo, SessionSandboxMap } from "./types";
+import type { SandboxInfo, SessionSandboxMap, ProjectSessionData } from "./types";
 
 export class DaytonaSessionManager {
   private readonly apiKey: string;
-  private readonly sessionMapFile: string;
+  private readonly storageDir: string;
   private readonly logger: Logger;
   private sessionSandboxes: SessionSandboxMap;
+  private currentProjectId?: string;
 
-  constructor(apiKey: string, sessionMapFile: string, logger: Logger) {
+  constructor(apiKey: string, storageDir: string, logger: Logger) {
     this.apiKey = apiKey;
-    this.sessionMapFile = sessionMapFile;
+    this.storageDir = storageDir;
     this.logger = logger;
-    this.sessionSandboxes = this.loadSessionMap();
-  }
-
-  /**
-   * Load session map from file
-   */
-  private loadSessionMap(): SessionSandboxMap {
-    const map: SessionSandboxMap = new Map();
-    try {
-      if (existsSync(this.sessionMapFile)) {
-        const data = JSON.parse(readFileSync(this.sessionMapFile, 'utf-8')) as Record<string, SandboxInfo>;
-        for (const [sessionId, sandboxInfo] of Object.entries(data)) {
-          map.set(sessionId, sandboxInfo);
-        }
-      }
-    } catch (err) {
-      this.logger.error(`Failed to load session map: ${err}`);
+    this.sessionSandboxes = new Map();
+    
+    // Ensure storage directory exists
+    if (!existsSync(this.storageDir)) {
+      mkdirSync(this.storageDir, { recursive: true });
     }
-    return map;
   }
 
   /**
-   * Save session map to file
+   * Get the file path for a project's session data
    */
-  private saveSessionMap(): void {
+  private getProjectFilePath(projectId: string): string {
+    return join(this.storageDir, `${projectId}.json`);
+  }
+
+  /**
+   * Load project session data from disk
+   */
+  private loadProjectData(projectId: string): ProjectSessionData | null {
+    const filePath = this.getProjectFilePath(projectId);
     try {
-      const data: Record<string, SandboxInfo> = {};
-      for (const [sessionId, sandbox] of this.sessionSandboxes.entries()) {
-        data[sessionId] = { id: sandbox.id };
+      if (existsSync(filePath)) {
+        return JSON.parse(readFileSync(filePath, 'utf-8')) as ProjectSessionData;
       }
-      writeFileSync(this.sessionMapFile, JSON.stringify(data, null, 2));
     } catch (err) {
-      this.logger.error(`Failed to save session map: ${err}`);
+      this.logger.error(`Failed to load project data for ${projectId}: ${err}`);
+    }
+    return null;
+  }
+
+  /**
+   * Load sessions for a specific project into memory
+   */
+  private loadProjectSessions(projectId: string): void {
+    const projectData = this.loadProjectData(projectId);
+    if (projectData) {
+      for (const [sessionId, sessionInfo] of Object.entries(projectData.sessions)) {
+        this.sessionSandboxes.set(sessionId, { id: sessionInfo.sandboxId });
+      }
+      this.logger.info(`Loaded ${Object.keys(projectData.sessions).length} sessions for project ${projectId}`);
+    }
+  }
+
+  /**
+   * Save project session data to disk
+   */
+  private saveProjectData(projectId: string, worktree: string, sessions: Record<string, { sandboxId: string; created: number; lastAccessed: number }>): void {
+    const filePath = this.getProjectFilePath(projectId);
+    const projectData: ProjectSessionData = {
+      projectId,
+      worktree,
+      sessions,
+    };
+    
+    try {
+      writeFileSync(filePath, JSON.stringify(projectData, null, 2));
+      this.logger.info(`Saved project data for ${projectId}`);
+    } catch (err) {
+      this.logger.error(`Failed to save project data for ${projectId}: ${err}`);
+    }
+  }
+
+  /**
+   * Update a single session in the project file
+   */
+  private updateSession(projectId: string, worktree: string, sessionId: string, sandboxId: string): void {
+    const projectData = this.loadProjectData(projectId) || {
+      projectId,
+      worktree,
+      sessions: {},
+    };
+
+    const now = Date.now();
+    if (!projectData.sessions[sessionId]) {
+      projectData.sessions[sessionId] = {
+        sandboxId,
+        created: now,
+        lastAccessed: now,
+      };
+    } else {
+      projectData.sessions[sessionId].sandboxId = sandboxId;
+      projectData.sessions[sessionId].lastAccessed = now;
+    }
+
+    this.saveProjectData(projectId, worktree, projectData.sessions);
+  }
+
+  /**
+   * Set the current project context
+   */
+  setProjectContext(projectId: string): void {
+    if (this.currentProjectId !== projectId) {
+      this.currentProjectId = projectId;
+      this.loadProjectSessions(projectId);
     }
   }
 
   /**
    * Get or create a sandbox for the given session ID
    */
-  async getSandbox(sessionId: string): Promise<Sandbox> {
+  async getSandbox(sessionId: string, projectId: string, worktree: string): Promise<Sandbox> {
     if (!this.apiKey) {
       this.logger.error('DAYTONA_API_KEY is not set. Cannot create or retrieve sandbox.');
       throw new Error('DAYTONA_API_KEY is not set. Please set the environment variable to use Daytona sandboxes.');
     }
 
+    // Load project sessions if needed
+    this.setProjectContext(projectId);
+
     if (!this.sessionSandboxes.has(sessionId)) {
-      this.logger.info(`Creating new sandbox for session: ${sessionId}`);
+      this.logger.info(`Creating new sandbox for session: ${sessionId} in project: ${projectId}`);
       const daytona = new Daytona({ apiKey: this.apiKey });
       const sandbox = await daytona.create();
       this.sessionSandboxes.set(sessionId, sandbox);
-      this.saveSessionMap();
-      this.logger.info(`Sandbox created successfully.`);
+      this.updateSession(projectId, worktree, sessionId, sandbox.id);
+      this.logger.info(`Sandbox created successfully: ${sandbox.id}`);
     } else {
       const sandboxInfo = this.sessionSandboxes.get(sessionId);
       if (sandboxInfo && !('process' in sandboxInfo)) {
+        this.logger.info(`Reconnecting to sandbox: ${sandboxInfo.id}`);
         const daytona = new Daytona({ apiKey: this.apiKey });
         const sandbox = await daytona.create();
         this.sessionSandboxes.set(sessionId, sandbox);
-        this.saveSessionMap();
+        this.updateSession(projectId, worktree, sessionId, sandbox.id);
       } else {
         this.logger.info(`Reusing existing sandbox for session: ${sessionId}`);
+        // Update last accessed time
+        this.updateSession(projectId, worktree, sessionId, sandboxInfo!.id);
       }
     }
 
@@ -94,13 +164,20 @@ export class DaytonaSessionManager {
   /**
    * Delete the sandbox associated with the given session ID
    */
-  async deleteSandbox(sessionId: string): Promise<void> {
+  async deleteSandbox(sessionId: string, projectId: string): Promise<void> {
     const sandbox = this.sessionSandboxes.get(sessionId);
     if (sandbox && 'delete' in sandbox) {
       this.logger.info(`Removing sandbox for session: ${sessionId}`);
       await sandbox.delete();
       this.sessionSandboxes.delete(sessionId);
-      this.saveSessionMap();
+      
+      // Remove from project file
+      const projectData = this.loadProjectData(projectId);
+      if (projectData && projectData.sessions[sessionId]) {
+        delete projectData.sessions[sessionId];
+        this.saveProjectData(projectId, projectData.worktree, projectData.sessions);
+      }
+      
       this.logger.info(`Sandbox deleted successfully.`);
     } else {
       this.logger.warn(`No sandbox found for session: ${sessionId}`);
