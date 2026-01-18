@@ -39,6 +39,25 @@ The plugin automatically:
 - Manages sandbox lifecycle (create on session start, destroy on session end)
 - Ensures reproducible environments with proper dependency isolation
 
+### Storage
+
+The plugin stores sandbox session data using a project-based storage structure that aligns with OpenCode's storage patterns:
+
+- **Location**: Uses the XDG Base Directory specification via the `xdg-basedir` package ([same as OpenCode core](https://github.com/anomalyco/opencode/blob/052f887a9a7aaf79d9f1a560f9b686d59faa8348/packages/opencode/src/global/index.ts#L4))
+  - **macOS/Linux**: `~/.local/share/opencode/storage/daytona/`
+  - **Windows**: `%LOCALAPPDATA%\opencode\storage\daytona\` or `%APPDATA%\opencode\storage\daytona\`
+
+- **Structure**: Each project gets its own JSON file named `{projectId}.json` containing:
+  - Session-to-sandbox mappings
+  - Sandbox metadata (ID, created timestamp, last accessed timestamp)
+  - Automatic cleanup tracking
+
+This approach ensures:
+- Session persistence across OpenCode restarts
+- Proper sandbox reuse within the same project
+- Clean separation between different projects
+- Cross-platform compatibility
+
 ## Requirements
 
 - Node.js 16+ or Bun
