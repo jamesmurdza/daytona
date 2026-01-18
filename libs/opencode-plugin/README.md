@@ -50,17 +50,6 @@ The plugin automatically:
 
 This plugin is part of the Daytona monorepo. For development:
 
-### Building from Source
-
-```bash
-npx nx build opencode-plugin
-```
-
-The build outputs to `libs/opencode-plugin/dist/` and includes:
-- Compiled JavaScript (`.opencode/plugin/index.js`)
-- TypeScript declarations (`.opencode/plugin/index.d.ts`)
-- Source maps
-
 ### Development Workflow
 
 1. **Make changes** to the plugin source in `libs/opencode-plugin/.opencode/plugin/`
