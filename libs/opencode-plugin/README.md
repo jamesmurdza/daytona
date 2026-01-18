@@ -2,15 +2,11 @@
 
 An OpenCode plugin that automatically runs all your OpenCode sessions in Daytona sandboxes. This provides isolated, reproducible development environments for your AI coding sessions.
 
-## Installation
-
-```bash
-npm install @jamesmurdza/opencode-daytona
-```
-
 ## Usage
 
-Add the plugin to your OpenCode configuration file (`.opencode/config.json` or `opencode.json`):
+### Installation
+
+Add the plugin to your project's OpenCode configuration file (`.opencode/config.json` or `opencode.json`):
 
 ```json
 {
@@ -69,24 +65,17 @@ The build outputs to `libs/opencode-plugin/dist/` and includes:
 
 1. **Make changes** to the plugin source in `libs/opencode-plugin/.opencode/plugin/`
 
-2. **Build the plugin:**
-   ```bash
-   npx nx build opencode-plugin
-   ```
-
-3. **Test locally** by linking the package:
-   ```bash
-   cd libs/opencode-plugin/dist
-   npm link
-   
-   # In your test project
-   npm link @jamesmurdza/opencode-daytona
-   ```
-
-4. **Watch mode** for development:
+2. **Test locally** by running OpenCode in the plugin directory:
    ```bash
    cd libs/opencode-plugin
-   npm run dev
+   opencode
+   ```
+   
+   OpenCode will automatically detect and load the TypeScript plugin from the local `.opencode/plugin/` directory (no build step needed for local testing!)
+
+3. **Build for publishing:**
+   ```bash
+   npx nx build opencode-plugin
    ```
 
 ### Publishing
