@@ -118,18 +118,23 @@ This will:
 ```
 libs/opencode-plugin/
 ├── .opencode/
-│   └── plugin/
-│       └── index.ts          # Plugin source code
-├── dist/                     # Build output (gitignored)
+│   ├── plugin/
+│   │   ├── daytona/
+│   │   │   ├── index.ts           # Main Daytona integration
+│   │   │   ├── logger.ts          # Logging utilities
+│   │   │   ├── plugins.ts         # Plugin configuration
+│   │   │   ├── session-manager.ts # Sandbox lifecycle management
+│   │   │   ├── tools.ts           # Custom MCP tools
+│   │   │   └── types.ts           # TypeScript type definitions
+│   │   └── index.ts               # Plugin entry point
+├── dist/                          # Build output (gitignored)
 │   ├── .opencode/
 │   │   └── plugin/
-│   │       ├── index.js
-│   │       ├── index.d.ts
-│   │       └── *.map
+│   │       ├── ...
 │   └── package.json
-├── package.json              # Package metadata
-├── project.json              # Nx build configuration
-├── tsconfig.json             # TypeScript config
+├── package.json                   # Package metadata
+├── project.json                   # Nx build configuration
+├── tsconfig.json                  # TypeScript config
 └── README.md
 ```
 
