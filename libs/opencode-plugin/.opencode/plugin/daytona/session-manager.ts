@@ -129,36 +129,34 @@ export class DaytonaSessionManager {
     // Load project sessions if needed
     this.setProjectContext(projectId);
 
-    if (!this.sessionSandboxes.has(sessionId)) {
-      this.logger.info(`Creating new sandbox for session: ${sessionId} in project: ${projectId}`);
+    const existing = this.sessionSandboxes.get(sessionId);
+    
+    // If we have a fully initialized sandbox, reuse it
+    if (existing && 'process' in existing) {
+      this.logger.info(`Reusing existing sandbox for session: ${sessionId}`);
+      // Update last accessed time
+      this.updateSession(projectId, worktree, sessionId, existing.id);
+      return existing as Sandbox;
+    }
+    
+    // If we have a sandboxId but not a full sandbox object, reconnect to it
+    if (existing && 'id' in existing && !('process' in existing)) {
+      this.logger.info(`Reconnecting to existing sandbox: ${existing.id}`);
       const daytona = new Daytona({ apiKey: this.apiKey });
-      const sandbox = await daytona.create();
+      const sandbox = await daytona.get(existing.id);
       this.sessionSandboxes.set(sessionId, sandbox);
       this.updateSession(projectId, worktree, sessionId, sandbox.id);
-      this.logger.info(`Sandbox created successfully: ${sandbox.id}`);
-    } else {
-      const sandboxInfo = this.sessionSandboxes.get(sessionId);
-      if (sandboxInfo && !('process' in sandboxInfo)) {
-        this.logger.info(`Reconnecting to sandbox: ${sandboxInfo.id}`);
-        const daytona = new Daytona({ apiKey: this.apiKey });
-        const sandbox = await daytona.create();
-        this.sessionSandboxes.set(sessionId, sandbox);
-        this.updateSession(projectId, worktree, sessionId, sandbox.id);
-      } else {
-        this.logger.info(`Reusing existing sandbox for session: ${sessionId}`);
-        // Update last accessed time
-        this.updateSession(projectId, worktree, sessionId, sandboxInfo!.id);
-      }
+      return sandbox;
     }
-
-    const sandbox = this.sessionSandboxes.get(sessionId);
-    if (!sandbox) {
-      throw new Error(`Failed to get sandbox for session: ${sessionId}`);
-    }
-    if (!('process' in sandbox)) {
-      throw new Error(`Sandbox is not fully initialized for session: ${sessionId}`);
-    }
-    return sandbox as Sandbox;
+    
+    // Otherwise, create a new sandbox
+    this.logger.info(`Creating new sandbox for session: ${sessionId} in project: ${projectId}`);
+    const daytona = new Daytona({ apiKey: this.apiKey });
+    const sandbox = await daytona.create();
+    this.sessionSandboxes.set(sessionId, sandbox);
+    this.updateSession(projectId, worktree, sessionId, sandbox.id);
+    this.logger.info(`Sandbox created successfully: ${sandbox.id}`);
+    return sandbox;
   }
 
   /**
