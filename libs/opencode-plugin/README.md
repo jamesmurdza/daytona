@@ -1,6 +1,6 @@
-# @jamesmurdza/opencode-daytona
+# Daytona Sandbox Plugin for OpenCode
 
-An OpenCode plugin that automatically runs all your OpenCode sessions in Daytona sandboxes. This provides isolated, reproducible development environments for your AI coding sessions.
+This is an OpenCode plugin that automatically runs all your OpenCode sessions in Daytona sandboxes. This provides isolated, reproducible development environments for your AI coding sessions.
 
 ## Usage
 
@@ -69,13 +69,25 @@ This approach ensures:
 
 This plugin is part of the Daytona monorepo. For development:
 
+### Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/jamesmurdza/daytona.git
+   cd daytona
+   ```
+
+2. **Navigate to the plugin directory:**
+   ```bash
+   cd libs/opencode-plugin
+   ```
+
 ### Development Workflow
 
-1. **Make changes** to the plugin source in `libs/opencode-plugin/.opencode/plugin/`
+1. **Make changes** to the plugin source in `.opencode/plugin/`
 
 2. **Test locally** by running OpenCode in the plugin directory:
    ```bash
-   cd libs/opencode-plugin
    opencode
    ```
    
