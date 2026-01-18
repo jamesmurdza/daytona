@@ -19,6 +19,12 @@
     ]
   },
   "neverConnectToCloud": true,
+  "workspaceLayout": {
+    "projectPatterns": [
+      "apps/*",
+      "libs/*"
+    ]
+  },
   "plugins": [
     {
       "plugin": "@nx/webpack/plugin",
