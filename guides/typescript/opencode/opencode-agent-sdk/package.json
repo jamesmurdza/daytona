@@ -1,0 +1,29 @@
+{
+  "name": "opencode-server",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Start the OpenCode API server in a Daytona sandbox and open it via a preview URL.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "opencode",
+    "sandbox",
+    "typescript",
+    "daytona"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@daytonaio/sdk": "^0.125.0",
+    "@opencode-ai/sdk": "^1.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "typescript": "^5.2.2"
+  }
+}
