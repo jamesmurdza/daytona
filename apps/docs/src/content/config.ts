@@ -420,15 +420,42 @@ export const getSidebarConfig = (
         },
         {
           type: 'link',
+          href: localizePath('/docs/guides/opencode', locale),
+          label: t('sidebarconfig.opencode'),
+          disablePagination: true,
+          attrs: {
+            icon: 'opencode.svg',
+          },
+        },
+        {
+          type: 'link',
+          href: localizePath(
+            '/docs/guides/opencode/opencode-plugin',
+            locale
+          ),
+          label: t('sidebarconfig.opencode'),
+          disablePagination: true,
+          hideInSidebar: true,
+        },
+        {
+          type: 'link',
+          href: localizePath(
+            '/docs/guides/opencode/opencode-sdk-agent',
+            locale
+          ),
+          label: t('sidebarconfig.opencode'),
+          disablePagination: true,
+          hideInSidebar: true,
+        },
+        {
+          type: 'link',
           href: localizePath(
             '/docs/guides/opencode/opencode-web-agent',
             locale
           ),
           label: t('sidebarconfig.opencode'),
           disablePagination: true,
-          attrs: {
-            icon: 'opencode.svg',
-          },
+          hideInSidebar: true,
         },
         {
           type: 'link',
@@ -502,15 +529,32 @@ export const getSidebarConfig = (
         },
         {
           type: 'link',
+          href: localizePath('/docs/guides/openclaw', locale),
+          label: t('sidebarconfig.openclaw'),
+          disablePagination: true,
+          attrs: {
+            icon: 'openclaw.svg',
+          },
+        },
+        {
+          type: 'link',
           href: localizePath(
             '/docs/guides/openclaw/openclaw-run-secure-sandbox',
             locale
           ),
           label: t('sidebarconfig.openclaw'),
           disablePagination: true,
-          attrs: {
-            icon: 'openclaw.svg',
-          },
+          hideInSidebar: true,
+        },
+        {
+          type: 'link',
+          href: localizePath(
+            '/docs/guides/openclaw/openclaw-sdk-sandbox',
+            locale
+          ),
+          label: t('sidebarconfig.openclaw'),
+          disablePagination: true,
+          hideInSidebar: true,
         },
         {
           type: 'link',
