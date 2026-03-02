@@ -5,11 +5,7 @@
 
 import type { PluginInput } from '@opencode-ai/plugin'
 import { SessionGitManager } from '../git/session-git-manager'
-import {
-  EVENT_TYPE_SESSION_DELETED,
-  EVENT_TYPE_SESSION_IDLE,
-  type EventSessionDeleted,
-} from '../core/types'
+import { EVENT_TYPE_SESSION_DELETED, EVENT_TYPE_SESSION_IDLE, type EventSessionDeleted } from '../core/types'
 import { toast } from '../core/toast'
 import { logger } from '../core/logger'
 import type { DaytonaSessionManager } from '../core/session-manager'
@@ -36,14 +32,20 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
       const start = Date.now()
       try {
         const sandbox = await sessionManager.getSandbox(sessionId, projectId, worktree, ctx)
-          const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
-          if (!branchNumber) return
-          const sessionGit = new SessionGitManager(sandbox, repoPath, worktree, branchNumber)
+        const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
+        if (!branchNumber) return
+        const sessionGit = new SessionGitManager(sandbox, repoPath, worktree, branchNumber)
         const didSync = await sessionGit.autoCommitAndPull(ctx)
-        logger.info(`[idle] done sessionId=${sessionId} sandboxId=${sandbox.id} synced=${didSync} in ${Date.now() - start}ms`)
+        logger.info(
+          `[idle] done sessionId=${sessionId} sandboxId=${sandbox.id} synced=${didSync} in ${Date.now() - start}ms`,
+        )
       } catch (err: any) {
         logger.error(`[idle] error sessionId=${sessionId} in ${Date.now() - start}ms: ${err}`)
-        toast.show({ title: 'Auto-commit error', message: err?.message || 'Failed to auto-commit and pull.', variant: 'error' })
+        toast.show({
+          title: 'Auto-commit error',
+          message: err?.message || 'Failed to auto-commit and pull.',
+          variant: 'error',
+        })
         throw err
       }
     }

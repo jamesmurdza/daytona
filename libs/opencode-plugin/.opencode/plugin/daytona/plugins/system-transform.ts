@@ -10,10 +10,7 @@ import type { ExperimentalChatSystemTransformInput, ExperimentalChatSystemTransf
  * Adds Daytona-specific instructions to the system prompt.
  */
 export async function systemPromptTransform(ctx: PluginInput, repoPath: string) {
-  return async (
-    input: ExperimentalChatSystemTransformInput,
-    output: ExperimentalChatSystemTransformOutput,
-  ) => {
+  return async (input: ExperimentalChatSystemTransformInput, output: ExperimentalChatSystemTransformOutput) => {
     output.system.push(
       [
         '## Daytona Sandbox Integration',
