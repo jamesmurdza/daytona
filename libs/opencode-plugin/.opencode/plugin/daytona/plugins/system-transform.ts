@@ -23,7 +23,7 @@ export function createSystemTransformPlugin(repoPath: string): Plugin {
             'This session is integrated with a Daytona sandbox.',
             `The main project repository is located at: ${repoPath}.`,
             'Bash commands will run in this directory.',
-            'Work in this directory. Do NOT try to use the current working directory of the host system.',
+            'Put all projects in the project directory. Do NOT try to use the current working directory of the host system.',
             "When executing long-running commands, use the 'background' option to run them asynchronously.",
             'Before showing a preview URL, ensure the server is running in the sandbox on that port.',
           ].join('\n'),
