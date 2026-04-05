@@ -1,0 +1,34 @@
+{
+  "name": "claude-code-computer-use-mcp",
+  "version": "1.0.0",
+  "description": "Claude Code with Computer Use MCP Server - Browser automation via Playwright MCP and Desktop automation via Daytona Computer Use API",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start:browser": "npm run build && node dist/browser-automation.js",
+    "start:desktop": "npm run build && node dist/desktop-automation.js",
+    "start": "npm run start:browser"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "computer-use",
+    "mcp",
+    "playwright",
+    "browser-automation",
+    "desktop-automation",
+    "daytona",
+    "sandbox"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@daytonaio/sdk": "^0.125.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "typescript": "^5.2.2"
+  }
+}
