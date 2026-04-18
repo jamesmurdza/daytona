@@ -40,7 +40,6 @@ import { spawn as nodeSpawn } from 'node:child_process'
 
 import { Daytona } from '@daytona/sdk'
 import type { Sandbox } from '@daytona/sdk'
-import { randomUUID } from 'node:crypto'
 
 let client: Daytona | undefined
 
@@ -55,6 +54,10 @@ function getDaytona(): Daytona {
 
 const previewCache = new Map<string, { url: string; token: string }>()
 const activeWorkspaces = new Set<string>()
+
+function sandboxName(name: string): string {
+  return `opencode-${name}`
+}
 
 const REPO_PATH = '/home/daytona/workspace/repo'
 const ROOT_PATH = '/home/daytona/workspace'
@@ -96,7 +99,7 @@ async function spawnAsync(cmd: string[], options: { cwd?: string } = {}): Promis
 }
 
 async function withSandbox<T>(name: string, fn: (sandbox: Sandbox) => Promise<T>): Promise<T> {
-  const sandbox = await getDaytona().get(name)
+  const sandbox = await getDaytona().get(sandboxName(name))
   return fn(sandbox)
 }
 
@@ -119,12 +122,7 @@ export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) =>
     description: 'Create a remote Daytona sandbox workspace',
 
     configure(config) {
-      // Generate a unique sandbox name: opencode-xxxxxxxx-xxxxxxxx
-      const id = randomUUID().replace(/-/g, '').slice(0, 16)
-      return {
-        ...config,
-        name: `opencode-${id.slice(0, 8)}-${id.slice(8)}`,
-      }
+      return config
     },
 
     async create(config, env) {
@@ -132,7 +130,7 @@ export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) =>
 
       try {
         const sandbox = await getDaytona().create({
-          name: config.name,
+          name: sandboxName(config.name),
           envVars: toEnvVars(env as Record<string, unknown>),
         })
 
@@ -228,7 +226,7 @@ OPENCODE_PLUGIN_EOF`)
 
     async remove(config) {
       const d = getDaytona()
-      const sandbox = await d.get(config.name).catch(() => undefined)
+      const sandbox = await d.get(sandboxName(config.name)).catch(() => undefined)
       if (!sandbox) return
       await d.delete(sandbox)
       previewCache.delete(config.name)
