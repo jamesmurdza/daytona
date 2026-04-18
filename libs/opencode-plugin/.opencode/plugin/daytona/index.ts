@@ -168,9 +168,10 @@ export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) =>
 
         await run(`printf "%s\\n" ${sh(project.id)} > ${sh(`${REPO_PATH}/.git/opencode`)}`)
 
-        // Create opencode.json with system prompt for Daytona sandbox context
+        // Create instructions file for Daytona sandbox context
+        const instructionsDir = `${REPO_PATH}/.opencode/instructions`
         const sandboxId = sandbox.id
-        const systemPrompt = `## Daytona Sandbox Integration
+        const instructions = `## Daytona Sandbox Integration
 This session is integrated with a Daytona sandbox.
 The main project repository is located at: ${REPO_PATH}
 
@@ -195,10 +196,16 @@ For example, if a server is running on port 8000:
 https://8000-${sandboxId}.daytonaproxy01.net/
 \`\`\`
 `
+        await run(`mkdir -p ${sh(instructionsDir)}`)
+        await run(`cat > ${sh(instructionsDir + '/daytona.md')} << 'OPENCODE_INSTRUCTIONS_EOF'
+${instructions}
+OPENCODE_INSTRUCTIONS_EOF`)
+
+        // Create opencode.json to load the instructions
         const opencodeConfig = JSON.stringify(
           {
             $schema: 'https://opencode.ai/config.json',
-            systemPrompt,
+            instructions: ['.opencode/instructions/daytona.md'],
           },
           null,
           2,
