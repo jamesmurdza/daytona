@@ -40,6 +40,7 @@ import { spawn as nodeSpawn } from 'node:child_process'
 
 import { Daytona } from '@daytona/sdk'
 import type { Sandbox } from '@daytona/sdk'
+import { randomUUID } from 'node:crypto'
 
 let client: Daytona | undefined
 
@@ -118,7 +119,12 @@ export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) =>
     description: 'Create a remote Daytona sandbox workspace',
 
     configure(config) {
-      return config
+      // Generate a unique sandbox name with opencode prefix
+      const uuid = randomUUID().split('-')[0]
+      return {
+        ...config,
+        name: `opencode-${uuid}`,
+      }
     },
 
     async create(config, env) {
