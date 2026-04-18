@@ -119,10 +119,11 @@ export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) =>
     description: 'Create a remote Daytona sandbox workspace',
 
     configure(config) {
-      // Generate a unique sandbox name with opencode prefix
+      // Generate a unique sandbox name: opencode-xxxxxxxx-xxxxxxxx
+      const id = randomUUID().replace(/-/g, '').slice(0, 16)
       return {
         ...config,
-        name: `opencode-${randomUUID()}`,
+        name: `opencode-${id.slice(0, 8)}-${id.slice(8)}`,
       }
     },
 
