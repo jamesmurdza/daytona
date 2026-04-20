@@ -24,7 +24,7 @@ Add the plugin to your project's `.opencode/opencode.jsonc`:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@daytona/opencode"]
+  "plugin": ["@daytona/opencode"],
 }
 ```
 
