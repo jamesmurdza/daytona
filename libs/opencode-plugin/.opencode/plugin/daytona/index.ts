@@ -4,51 +4,267 @@
  */
 
 /**
- * OpenCode Plugin: Daytona Sandbox Integration
- *
- * OpenCode plugins extend the AI coding assistant by adding custom tools, handling events,
- * and modifying behavior. Plugins are TypeScript/JavaScript modules that export functions
- * which return hooks for various lifecycle events.
- *
- * This plugin integrates Daytona sandboxes with OpenCode, providing isolated development
- * environments for each session. It adds custom tools for file operations, command execution,
- * and search within sandboxes, and automatically cleans up resources when sessions end.
- *
- * Learn more: https://opencode.ai/docs/plugins/
- *
- * Daytona Sandbox Integration Tools
- *
- * Requires:
- * - npm install @daytona/sdk
- * - Environment: DAYTONA_API_KEY
+ * OpenCode plugin that registers Daytona sandboxes as a workspace adaptor.
+ * Each session spawns a remote sandbox running `opencode serve`; tool calls
+ * are proxied over the preview URL rather than invoked locally.
  */
 
-import { join } from 'path'
-import { xdgData } from 'xdg-basedir'
 import type { PluginInput } from '@opencode-ai/plugin'
-import { setLogFilePath } from './core/logger'
-import { DaytonaSessionManager } from './core/session-manager'
-import { toast } from './core/toast'
-import { customTools } from './plugins/custom-tools'
-import { eventHandlers } from './plugins/session-events'
-import { systemPromptTransform } from './plugins/system-transform'
 
-export type { EventSessionDeleted, LogLevel, SandboxInfo, SessionInfo, ProjectSessionData } from './core/types'
-
-const LOG_FILE = join(xdgData, 'opencode', 'log', 'daytona.log')
-const STORAGE_DIR = join(xdgData, 'opencode', 'storage', 'daytona')
-const REPO_PATH = '/home/daytona/project'
-
-setLogFilePath(LOG_FILE)
-const sessionManager = new DaytonaSessionManager(process.env.DAYTONA_API_KEY || '', STORAGE_DIR, REPO_PATH)
-
-async function daytonaPlugin(ctx: PluginInput) {
-  toast.initialize(ctx.client?.tui)
-  return {
-    tool: await customTools(ctx, sessionManager),
-    event: await eventHandlers(ctx, sessionManager, REPO_PATH),
-    'experimental.chat.system.transform': await systemPromptTransform(ctx, REPO_PATH),
-  }
+// These types are defined locally because the @opencode-ai/plugin versions that
+// export them (1.4.17+) are currently quarantined on npm. Once a non-quarantined
+// version with these types is published, we can import them directly.
+// See: https://github.com/anomalyco/opencode/issues/XXXXX
+type WorkspaceInfo = {
+  id: string
+  type: string
+  name: string
+  branch: string | null
+  directory: string | null
+  extra: unknown | null
+  projectID: string
 }
 
-export default daytonaPlugin
+type WorkspaceTarget =
+  | { type: 'local'; directory: string }
+  | { type: 'remote'; url: string | URL; headers?: HeadersInit }
+
+type WorkspaceAdaptor = {
+  name: string
+  description: string
+  configure(config: WorkspaceInfo): WorkspaceInfo | Promise<WorkspaceInfo>
+  create(config: WorkspaceInfo, from?: WorkspaceInfo): Promise<void>
+  remove(config: WorkspaceInfo): Promise<void>
+  target(config: WorkspaceInfo): WorkspaceTarget | Promise<WorkspaceTarget>
+}
+
+// Extended PluginInput that includes the experimental workspace API.
+// The base PluginInput from @opencode-ai/plugin doesn't include this yet.
+type PluginInputWithWorkspace = PluginInput & {
+  experimental_workspace: {
+    register(type: string, adaptor: WorkspaceAdaptor): void
+  }
+}
+import { spawn as nodeSpawn } from 'node:child_process'
+import { mkdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { Daytona } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk'
+
+import { buildSandboxInstructions } from './instructions'
+
+// The published @opencode-ai/plugin WorkspaceAdaptor omits the `env` param that
+// opencode's control plane actually passes to create(). Tracked in
+// anomalyco/opencode#23233; delete this override once upstream republishes.
+type WorkspaceAdaptorWithEnv = Omit<WorkspaceAdaptor, 'create'> & {
+  create(config: WorkspaceInfo, env: Record<string, string | undefined>, from?: WorkspaceInfo): Promise<void>
+}
+
+// Lazy so DAYTONA_API_KEY is read at use-time, not module-load time.
+let client: Daytona | undefined
+
+// Accessor for the shared Daytona client; instantiates it on first call.
+function getDaytona(): Daytona {
+  if (client == null) {
+    client = new Daytona({
+      apiKey: process.env.DAYTONA_API_KEY,
+    })
+  }
+  return client
+}
+
+// Cache preview links so we don't refetch on every target() call.
+const previewCache = new Map<string, { url: string; token: string }>()
+
+// Namespace sandboxes to distinguish them from non-opencode sandboxes
+// in the same Daytona account.
+function sandboxName(name: string): string {
+  return `opencode-${name}`
+}
+
+const REPO_PATH = '/home/daytona/workspace/repo'
+const ROOT_PATH = '/home/daytona/workspace'
+const LOCAL_BIN = '/home/daytona/opencode'
+const INSTALL_BIN = '/home/daytona/.opencode/bin/opencode'
+const SERVER_PORT = 3096
+const HEALTH_URL = `http://127.0.0.1:${SERVER_PORT}/global/health`
+
+// POSIX-safe single-quote escape: close quote, emit literal ', reopen quote.
+function sh(value: string): string {
+  return `'${value.replace(/'/g, "'\"'\"'")}'`
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Runs a host-side command (not in the sandbox); rejects with aggregated stderr on non-zero exit.
+async function spawnAsync(cmd: string[], options: { cwd?: string } = {}): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = nodeSpawn(cmd[0], cmd.slice(1), {
+      cwd: options.cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    let stderr = ''
+    proc.stderr?.on('data', (data: Buffer) => {
+      stderr += data.toString()
+    })
+
+    proc.on('close', (code: number | null) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(stderr || `Command failed with exit code ${code}: ${cmd.join(' ')}`))
+      }
+    })
+
+    proc.on('error', reject)
+  })
+}
+
+// Looks up a sandbox by its plugin-side name and passes the handle to `fn`.
+async function withSandbox<T>(name: string, fn: (sandbox: Sandbox) => Promise<T>): Promise<T> {
+  const sandbox = await getDaytona().get(sandboxName(name))
+  return fn(sandbox)
+}
+
+// Drop undefined values so Daytona (whose envVars wants Record<string, string>) accepts the map.
+function toEnvVars(env: Record<string, string | undefined>): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) result[key] = value
+  }
+  return result
+}
+
+export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) => {
+  const { experimental_workspace, worktree, project } = input
+
+  const adaptor: WorkspaceAdaptorWithEnv = {
+    name: 'Daytona',
+    description: 'Create a remote Daytona sandbox workspace',
+
+    // No-op: opencode's default config is fine as-is.
+    configure(config) {
+      return config
+    },
+
+    // Provision a fresh sandbox: upload the repo, install opencode, start `opencode serve`.
+    async create(config, env) {
+      const temp = join(tmpdir(), `opencode-daytona-${Date.now()}`)
+
+      try {
+        const sandbox = await getDaytona().create({
+          name: sandboxName(config.name),
+          envVars: toEnvVars(env),
+        })
+
+        // Stream sandbox command output to host stdout; throw on non-zero exit.
+        const run = async (command: string): Promise<void> => {
+          const result = await sandbox.process.executeCommand(command)
+          if (result.result) {
+            process.stdout.write(result.result)
+          }
+          if (result.exitCode !== 0) {
+            throw new Error(result.result || `Sandbox command failed: ${command}`)
+          }
+        }
+
+        await mkdir(temp, { recursive: true })
+        const dir = join(temp, 'repo')
+        const tar = join(temp, 'repo.tgz')
+        const source = `file://${worktree}`
+
+        const cloneArgs = ['git', 'clone', '--depth', '1', '--no-local']
+        if (config.branch) {
+          cloneArgs.push('--branch', config.branch)
+        }
+        cloneArgs.push(source, dir)
+
+        await spawnAsync(cloneArgs, { cwd: tmpdir() })
+        await spawnAsync(['tar', '-czf', tar, '-C', temp, 'repo'])
+
+        await sandbox.fs.uploadFile(tar, 'repo.tgz')
+        await run(
+          `rm -rf ${sh(REPO_PATH)} && mkdir -p ${sh(ROOT_PATH)} && tar -xzf "$HOME/repo.tgz" -C "$HOME/workspace"`,
+        )
+
+        await run(
+          `mkdir -p "$HOME/.opencode/bin" && OPENCODE_INSTALL_DIR="$HOME/.opencode/bin" curl -fsSL https://opencode.ai/install | bash`,
+        )
+
+        await sandbox.fs.uploadFile(Buffer.from(`${project.id}\n`), `${REPO_PATH}/.git/opencode`)
+
+        const instructions = buildSandboxInstructions({ repoPath: REPO_PATH, sandboxId: sandbox.id })
+        await sandbox.fs.uploadFile(Buffer.from(instructions), `${REPO_PATH}/.opencode/instructions/daytona.md`)
+
+        // Create opencode.json to load the instructions
+        const opencodeConfig = JSON.stringify(
+          {
+            $schema: 'https://opencode.ai/config.json',
+            instructions: ['.opencode/instructions/daytona.md'],
+          },
+          null,
+          2,
+        )
+        await sandbox.fs.uploadFile(Buffer.from(opencodeConfig), `${REPO_PATH}/opencode.json`)
+
+        // Prefer a pre-baked opencode binary if the snapshot ships one;
+        // otherwise fall back to the version installed above.
+        await run(
+          `cd ${sh(REPO_PATH)} && exe=${sh(LOCAL_BIN)} && if [ ! -x "$exe" ]; then exe=${sh(INSTALL_BIN)}; fi && nohup env "$exe" serve --hostname 0.0.0.0 --port ${SERVER_PORT} >/tmp/opencode.log 2>&1 </dev/null &`,
+        )
+
+        for (let i = 0; i < 60; i++) {
+          const result = await sandbox.process.executeCommand(`curl -fsS ${sh(HEALTH_URL)}`)
+          if (result.exitCode === 0) {
+            return
+          }
+          await sleep(1000)
+        }
+
+        const log = await sandbox.process.executeCommand('test -f /tmp/opencode.log && cat /tmp/opencode.log || true')
+        throw new Error(log.result || 'Daytona workspace server did not become ready in time')
+      } finally {
+        await rm(temp, { recursive: true, force: true }).catch(() => undefined)
+      }
+    },
+
+    // Tear down the sandbox and drop its cached preview link.
+    async remove(config) {
+      const d = getDaytona()
+      const sandbox = await d.get(sandboxName(config.name)).catch(() => undefined)
+      if (!sandbox) return
+      await d.delete(sandbox)
+      previewCache.delete(config.name)
+    },
+
+    // Remote endpoint opencode proxies tool calls to.
+    async target(config) {
+      let link = previewCache.get(config.name)
+      if (!link) {
+        link = await withSandbox(config.name, (sandbox) => sandbox.getPreviewLink(SERVER_PORT))
+        previewCache.set(config.name, link)
+      }
+      return {
+        type: 'remote' as const,
+        url: link.url,
+        headers: {
+          'x-daytona-preview-token': link.token,
+          'x-daytona-skip-preview-warning': 'true',
+          'x-opencode-directory': REPO_PATH,
+        },
+      }
+    },
+  }
+
+  // Cast because the published WorkspaceAdaptor.create lacks the env param (see type decl above).
+  experimental_workspace.register('daytona', adaptor as unknown as WorkspaceAdaptor)
+
+  return {}
+}
+
+export default DaytonaWorkspacePlugin
