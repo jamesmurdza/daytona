@@ -87,7 +87,10 @@ function toSnakeCase(str: string): string {
  *
  */
 export function WithSpan(config?: string | SpanConfig) {
-  return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
+  return (target: any, propertyKey: any, descriptor?: PropertyDescriptor) => {
+    // Modern (ECMAScript) decorators pass (value, context); no descriptor.
+    // OTel instrumentation requires the legacy descriptor-based API, so skip in that case.
+    if (descriptor === undefined) return target
     const originalMethod = descriptor.value
     const methodName = String(propertyKey)
 
@@ -142,7 +145,8 @@ export function WithSpan(config?: string | SpanConfig) {
  *
  */
 export function WithMetric(config?: string | MetricConfig) {
-  return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
+  return (target: any, propertyKey: any, descriptor?: PropertyDescriptor) => {
+    if (descriptor === undefined) return target
     const originalMethod = descriptor.value
     const methodName = String(propertyKey)
 
@@ -211,7 +215,8 @@ export function WithInstrumentation(config?: string | InstrumentationConfig): Me
     decorators.push(WithMetric({ name, description, labels }))
   }
 
-  return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
+  return (target: any, propertyKey: any, descriptor?: PropertyDescriptor) => {
+    if (descriptor === undefined) return target
     decorators.forEach((decorator) => decorator(target, propertyKey, descriptor))
   }
 }
