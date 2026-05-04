@@ -17,6 +17,12 @@
     "@daytona/sdk": "^0.163.0",
     "@opencode-ai/plugin": "^1.4.11"
   },
+  "devDependencies": {
+    "@opencode-ai/sdk": "^1.14.33"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
   "bugs": {
     "url": "https://github.com/daytonaio/daytona/issues"
   },
