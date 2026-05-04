@@ -15,22 +15,21 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { Daytona } from '@daytona/sdk'
-import type { Sandbox } from '@daytona/sdk'
 import type { PluginInput, WorkspaceAdapter } from '@opencode-ai/plugin'
 
 import { buildSandboxInstructions } from './instructions'
 
 // Lazy so DAYTONA_API_KEY is read at use-time, not module-load time.
-let client: Daytona | undefined
+let daytonaClient: Daytona | undefined
 
 // Accessor for the shared Daytona client; instantiates it on first call.
 function getDaytona(): Daytona {
-  if (client == null) {
-    client = new Daytona({
+  if (daytonaClient == null) {
+    daytonaClient = new Daytona({
       apiKey: process.env.DAYTONA_API_KEY,
     })
   }
-  return client
+  return daytonaClient
 }
 
 // Cache preview links so we don't refetch on every target() call.
@@ -81,12 +80,6 @@ async function spawnAsync(cmd: string[], options: { cwd?: string } = {}): Promis
 
     proc.on('error', reject)
   })
-}
-
-// Looks up a sandbox by its plugin-side name and passes the handle to `fn`.
-async function withSandbox<T>(name: string, fn: (sandbox: Sandbox) => Promise<T>): Promise<T> {
-  const sandbox = await getDaytona().get(sandboxName(name))
-  return fn(sandbox)
 }
 
 // Drop undefined values so Daytona (whose envVars wants Record<string, string>) accepts the map.
@@ -159,7 +152,6 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
         const instructions = buildSandboxInstructions({ repoPath: REPO_PATH, sandboxId: sandbox.id })
         await sandbox.fs.uploadFile(Buffer.from(instructions), `${REPO_PATH}/.opencode/instructions/daytona.md`)
 
-        // Create opencode.json to load the instructions
         const opencodeConfig = JSON.stringify(
           {
             $schema: 'https://opencode.ai/config.json',
@@ -208,7 +200,8 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
     async target(config) {
       let link = previewCache.get(config.name)
       if (!link) {
-        link = await withSandbox(config.name, (sandbox) => sandbox.getPreviewLink(SERVER_PORT))
+        const sandbox = await getDaytona().get(sandboxName(config.name))
+        link = await sandbox.getPreviewLink(SERVER_PORT)
         previewCache.set(config.name, link)
       }
       return {
