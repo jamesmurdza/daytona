@@ -136,7 +136,11 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
         cloneArgs.push(source, dir)
 
         await spawnAsync(cloneArgs, { cwd: tmpdir() })
-        await spawnAsync(['tar', '-czf', tar, '-C', temp, 'repo'])
+        // Strip the host's .opencode/: it's host-side opencode config (agents,
+        // plugins, instructions). The sandbox runs its own opencode and copying
+        // the host's would clobber the plugin's own .opencode/ writes — and
+        // breaks outright if .opencode is a symlink (the local-dev recipe).
+        await spawnAsync(['tar', '--exclude=repo/.opencode', '-czf', tar, '-C', temp, 'repo'])
 
         await sandbox.fs.uploadFile(tar, 'repo.tgz')
         await run(
