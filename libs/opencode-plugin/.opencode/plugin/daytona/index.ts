@@ -9,42 +9,6 @@
  * are proxied over the preview URL rather than invoked locally.
  */
 
-import type { PluginInput } from '@opencode-ai/plugin'
-
-// These types are defined locally because the @opencode-ai/plugin versions that
-// export them (1.4.17+) are currently quarantined on npm. Once a non-quarantined
-// version with these types is published, we can import them directly.
-// See: https://github.com/anomalyco/opencode/issues/XXXXX
-type WorkspaceInfo = {
-  id: string
-  type: string
-  name: string
-  branch: string | null
-  directory: string | null
-  extra: unknown | null
-  projectID: string
-}
-
-type WorkspaceTarget =
-  | { type: 'local'; directory: string }
-  | { type: 'remote'; url: string | URL; headers?: HeadersInit }
-
-type WorkspaceAdaptor = {
-  name: string
-  description: string
-  configure(config: WorkspaceInfo): WorkspaceInfo | Promise<WorkspaceInfo>
-  create(config: WorkspaceInfo, from?: WorkspaceInfo): Promise<void>
-  remove(config: WorkspaceInfo): Promise<void>
-  target(config: WorkspaceInfo): WorkspaceTarget | Promise<WorkspaceTarget>
-}
-
-// Extended PluginInput that includes the experimental workspace API.
-// The base PluginInput from @opencode-ai/plugin doesn't include this yet.
-type PluginInputWithWorkspace = PluginInput & {
-  experimental_workspace: {
-    register(type: string, adaptor: WorkspaceAdaptor): void
-  }
-}
 import { spawn as nodeSpawn } from 'node:child_process'
 import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -52,15 +16,9 @@ import { join } from 'node:path'
 
 import { Daytona } from '@daytona/sdk'
 import type { Sandbox } from '@daytona/sdk'
+import type { PluginInput, WorkspaceAdapter } from '@opencode-ai/plugin'
 
 import { buildSandboxInstructions } from './instructions'
-
-// The published @opencode-ai/plugin WorkspaceAdaptor omits the `env` param that
-// opencode's control plane actually passes to create(). Tracked in
-// anomalyco/opencode#23233; delete this override once upstream republishes.
-type WorkspaceAdaptorWithEnv = Omit<WorkspaceAdaptor, 'create'> & {
-  create(config: WorkspaceInfo, env: Record<string, string | undefined>, from?: WorkspaceInfo): Promise<void>
-}
 
 // Lazy so DAYTONA_API_KEY is read at use-time, not module-load time.
 let client: Daytona | undefined
@@ -140,10 +98,10 @@ function toEnvVars(env: Record<string, string | undefined>): Record<string, stri
   return result
 }
 
-export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) => {
+export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
   const { experimental_workspace, worktree, project } = input
 
-  const adaptor: WorkspaceAdaptorWithEnv = {
+  const adaptor: WorkspaceAdapter = {
     name: 'Daytona',
     description: 'Create a remote Daytona sandbox workspace',
 
@@ -265,8 +223,7 @@ export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) =>
     },
   }
 
-  // Cast because the published WorkspaceAdaptor.create lacks the env param (see type decl above).
-  experimental_workspace.register('daytona', adaptor as unknown as WorkspaceAdaptor)
+  experimental_workspace.register('daytona', adaptor)
 
   return {}
 }
