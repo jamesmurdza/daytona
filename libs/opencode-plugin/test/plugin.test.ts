@@ -104,7 +104,11 @@ describe('opencode-plugin', () => {
           const after = (await daytona.list()).items
           leaks = after
             .filter((s) => !before.has(s.id))
+            // Daytona renames deleted sandboxes to DESTROYED_<name>_<ts> the
+            // moment teardown begins (state may still be "destroying"); those
+            // are not leaks — the plugin already cleaned them up.
             .map((s) => ({ id: s.id, name: (s as unknown as { name: string }).name }))
+            .filter((s) => !s.name.startsWith('DESTROYED_'))
           if (leaks.length > 0) break
           await new Promise((r) => setTimeout(r, 1000))
         }

@@ -155,13 +155,13 @@ export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) =>
     // Provision a fresh sandbox: upload the repo, install opencode, start `opencode serve`.
     async create(config, env) {
       const temp = join(tmpdir(), `opencode-daytona-${Date.now()}`)
+      const d = getDaytona()
+      const sandbox = await d.create({
+        name: sandboxName(config.name),
+        envVars: toEnvVars(env),
+      })
 
       try {
-        const sandbox = await getDaytona().create({
-          name: sandboxName(config.name),
-          envVars: toEnvVars(env),
-        })
-
         // Stream sandbox command output to host stdout; throw on non-zero exit.
         const run = async (command: string): Promise<void> => {
           const result = await sandbox.process.executeCommand(command)
@@ -228,6 +228,10 @@ export const DaytonaWorkspacePlugin = async (input: PluginInputWithWorkspace) =>
 
         const log = await sandbox.process.executeCommand('test -f /tmp/opencode.log && cat /tmp/opencode.log || true')
         throw new Error(log.result || 'Daytona workspace server did not become ready in time')
+      } catch (err) {
+        // Don't leak the sandbox if anything after Daytona.create() throws.
+        await d.delete(sandbox).catch(() => undefined)
+        throw err
       } finally {
         await rm(temp, { recursive: true, force: true }).catch(() => undefined)
       }
