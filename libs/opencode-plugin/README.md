@@ -59,7 +59,7 @@ OPENCODE_EXPERIMENTAL_WORKSPACES=true opencode
 ### Creating a Daytona Workspace
 
 1. Press `Ctrl+P` to open the command palette
-2. Search for "warp" and select the command
+2. Search for "workspace" and select "Set workspace"
 3. Select "Daytona" as the workspace type
 4. The plugin will create a sandbox, upload your repository, and start the OpenCode server
 
