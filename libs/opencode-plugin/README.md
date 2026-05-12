@@ -153,7 +153,8 @@ libs/opencode-plugin/
 ├── .opencode/
 │   └── plugin/
 │       ├── daytona/
-│       │   └── index.ts
+│       │   ├── index.ts
+│       │   └── instructions.ts
 │       └── index.ts
 ├── package.json
 ├── project.json
