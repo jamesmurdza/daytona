@@ -94,6 +94,10 @@ function toEnvVars(env: Record<string, string | undefined>): Record<string, stri
 export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
   const { experimental_workspace, worktree, project } = input
 
+  if (!process.env.DAYTONA_API_KEY) {
+    console.warn('[daytona] DAYTONA_API_KEY is not set - Daytona workspaces will not work')
+  }
+
   const adaptor: WorkspaceAdapter = {
     name: 'Daytona',
     description: 'Create a remote Daytona sandbox workspace',
