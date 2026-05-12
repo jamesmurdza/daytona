@@ -105,6 +105,10 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
 
     // Provision a fresh sandbox: upload the repo, install opencode, start `opencode serve`.
     async create(config, env) {
+      if (!process.env.DAYTONA_API_KEY) {
+        throw new Error('DAYTONA_API_KEY environment variable is not set')
+      }
+
       const temp = join(tmpdir(), `opencode-daytona-${Date.now()}`)
       const d = getDaytona()
       const sandbox = await d.create({
