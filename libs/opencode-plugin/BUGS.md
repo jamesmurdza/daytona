@@ -15,7 +15,7 @@ This document summarizes all known bugs affecting the Daytona OpenCode plugin an
 | [Warp session errors swallowed](#5-warp-session-errors-swallowed) | Medium | Easy (~10 lines) | OpenCode | None found |
 | [Adapter loading errors swallowed](#6-adapter-loading-errors-swallowed) | Low | Easy (~10 lines) | OpenCode | Related: [#21638](https://github.com/sst/opencode/issues/21638) |
 | [No plugin logging API](#7-no-plugin-logging-api) | Medium | Medium (~50 lines) | OpenCode | Related: [#20196](https://github.com/sst/opencode/issues/20196) (closed) |
-| [Can't delete empty workspaces](#8-cant-delete-empty-workspaces) | Medium | Hard (~300 lines) | OpenCode | None found |
+| [Can't delete empty workspaces](#8-cant-delete-empty-workspaces) | Medium | Medium (~50-100 lines) | OpenCode | None found |
 
 ---
 
@@ -164,10 +164,45 @@ OpenCode has a `copyChanges` mechanism for session warp, but it's not used for w
 
 ### Suggested Fix
 
-Options (pending OpenCode team input):
-1. Apply `git diff` patch after clone
-2. Copy working directory instead of `git clone`
-3. Extend workspace creation API to accept a patch
+**Plugin-side fix (~20 lines):** Apply `git diff HEAD` after clone to sync tracked file changes:
+
+```typescript
+// After git clone (line 146), before tar (line 151):
+
+// Capture uncommitted changes (staged + unstaged) from worktree
+const diffProc = nodeSpawn('git', ['diff', 'HEAD'], { cwd: worktree, stdio: ['ignore', 'pipe', 'pipe'] })
+let diffOutput = ''
+diffProc.stdout?.on('data', (data: Buffer) => { diffOutput += data.toString() })
+await new Promise((resolve) => diffProc.on('close', resolve))
+
+if (diffOutput.trim()) {
+  const patchFile = join(temp, 'changes.patch')
+  await writeFile(patchFile, diffOutput)
+  await spawnAsync(['git', 'apply', '--allow-empty', patchFile], { cwd: dir })
+}
+```
+
+**Limitations:**
+- Only syncs changes to **tracked** files (files already in git)
+- Untracked files (new files not yet `git add`ed) are NOT included
+- Binary file diffs may cause issues
+
+**To also sync untracked files (~10 more lines):**
+
+```typescript
+// Copy untracked files (excluding gitignored)
+const untrackedProc = nodeSpawn('git', ['ls-files', '--others', '--exclude-standard'], { cwd: worktree })
+let untracked = ''
+untrackedProc.stdout?.on('data', (data: Buffer) => { untracked += data.toString() })
+await new Promise((resolve) => untrackedProc.on('close', resolve))
+
+for (const file of untracked.trim().split('\n').filter(Boolean)) {
+  const src = join(worktree, file)
+  const dest = join(dir, file)
+  await mkdir(dirname(dest), { recursive: true })
+  await copyFile(src, dest)
+}
+```
 
 ### Workaround
 
@@ -207,15 +242,39 @@ if (!result?.data) {
 - Plugin errors (e.g., "DAYTONA_API_KEY not set") never reach the user
 - Contributes to orphaned workspaces (see Bug #8)
 
+### All Instances of `.catch(() => undefined)`
+
+Found 17 instances in TUI code. **4 are problematic** (hide real errors):
+
+| File | Line | Issue |
+|------|------|-------|
+| `prompt/index.tsx` | 225 | Workspace create - hides plugin errors |
+| `dialog-session-list.tsx` | 56 | Workspace create - hides plugin errors |
+| `dialog-workspace-create.tsx` | 67 | Adapter loading - hides why adapters fail |
+| `dialog-workspace-create.tsx` | 109 | Warp - hides why warp fails |
+
+The other 13 are acceptable (cleanup operations, optional data fetching, or have `fatal: false`).
+
 ### Suggested Fix
 
-Don't swallow errors - propagate them to the UI:
+**Simple fix:** Capture error before discarding, show in toast:
 
 ```typescript
+// Instead of:
 const result = await sdk.client.experimental.workspace
   .create({ type: selection.workspaceType, branch: null })
-// Let errors propagate, handle in caller
+  .catch(() => undefined)
+
+// Do:
+const result = await sdk.client.experimental.workspace
+  .create({ type: selection.workspaceType, branch: null })
+  .catch((err) => {
+    toast.show({ variant: "error", message: `Workspace creation failed: ${err.message}` })
+    return undefined
+  })
 ```
+
+This is ~5 lines per location, so ~20 lines total for all 4 instances.
 
 ---
 
@@ -336,11 +395,55 @@ There's no UI to delete workspaces that have no sessions. Workspaces can only be
 - No rollback when session attachment fails after workspace creation
 - Error swallowing (Bug #4) hides failures that cause orphans
 
+### Analysis
+
+The building blocks already exist:
+- **API:** `sdk.client.experimental.workspace.remove({ id })` works
+- **List:** `project.workspace.list()` returns all workspaces
+- **Missing:** Just a UI to show workspaces with delete action
+
 ### Suggested Fix
 
-- Add `/workspaces` command to list and manage workspaces
-- Add delete action for each workspace
-- Rollback workspace creation if session attachment fails
+**Simpler than expected (~50-100 lines):** Create a `/workspaces` command dialog similar to `/sessions`:
+
+```typescript
+// New file: dialog-workspace-list.tsx
+export function DialogWorkspaceList() {
+  const project = useProject()
+  const sdk = useSDK()
+  const toast = useToast()
+
+  const options = createMemo(() =>
+    project.workspace.list().map((ws) => ({
+      title: ws.name,
+      description: `${ws.type} - ${project.workspace.status(ws.id)}`,
+      value: ws.id,
+    }))
+  )
+
+  return (
+    <DialogSelect
+      title="Workspaces"
+      options={options()}
+      actions={[
+        {
+          command: "workspace.delete",
+          title: "delete",
+          onTrigger: async (option) => {
+            const result = await sdk.client.experimental.workspace.remove({ id: option.value })
+            if (result.error) {
+              toast.show({ variant: "error", message: errorMessage(result.error) })
+            }
+            await project.workspace.sync()
+          },
+        },
+      ]}
+    />
+  )
+}
+```
+
+Then register it as a command in the command palette.
 
 ### Workaround
 
