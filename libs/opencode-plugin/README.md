@@ -153,8 +153,6 @@ OPENCODE_EXPERIMENTAL_WORKSPACES=true opencode
 
 > **Note:** When developing locally with a symlink, OpenCode loads the TypeScript source directly, so no build step is required.
 
-> **Note:** For local development, ensure `@daytona/sdk` is listed in `.opencode/package.json`. OpenCode auto-installs dependencies from this file when loading plugins.
-
 ### Building
 
 ```bash
