@@ -144,7 +144,7 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
 
         await sandbox.fs.uploadFile(tar, 'repo.tgz')
         await run(
-          `rm -rf ${sh(REPO_PATH)} && mkdir -p ${sh(ROOT_PATH)} && tar -xzf "$HOME/repo.tgz" -C "$HOME/workspace"`,
+          `rm -rf ${sh(REPO_PATH)} && mkdir -p ${sh(ROOT_PATH)} && tar -xzf "$HOME/repo.tgz" -C "$HOME/workspace" && rm "$HOME/repo.tgz"`,
         )
 
         await run(
