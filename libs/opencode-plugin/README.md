@@ -140,7 +140,24 @@ Install dependencies:
 yarn install
 ```
 
-### Development and Testing
+### Running Tests
+
+Run the test suite:
+
+```bash
+npx nx run opencode-plugin:test
+```
+
+Or directly with bun:
+
+```bash
+cd libs/opencode-plugin
+bun test --timeout 180000
+```
+
+Set `DAYTONA_API_KEY` to run the full test suite including sandbox cleanup tests.
+
+### Local Development
 
 To test the plugin locally, create a symlink in your test project:
 

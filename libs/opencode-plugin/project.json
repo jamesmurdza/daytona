@@ -20,7 +20,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "{projectRoot}",
-        "command": "bun test"
+        "command": "bun test --timeout 180000"
       }
     },
     "build": {
