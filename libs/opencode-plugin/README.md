@@ -11,7 +11,7 @@ OpenCode plugin that provisions Daytona sandboxes as remote workspaces.
 
 ## Requirements
 
-- OpenCode 1.4.11 or later
+- OpenCode 1.14.x or later
 - Daytona account and API key
 - `OPENCODE_EXPERIMENTAL_WORKSPACES=true` environment flag
 
