@@ -101,6 +101,26 @@ Grep the most recent OpenCode log for plugin-loading errors:
 ls -t ~/.local/share/opencode/log/*.log | head -1 | xargs grep -E "ERROR|@daytona|opencode/plugin/index"
 ```
 
+## Migrating from v0.167.0
+
+Version 0.168.0 rewrites the plugin to use OpenCode's workspace adaptor API. This provides a simpler architecture but removes some features from the original implementation:
+
+- Bidirectional git sync between local and sandbox
+- Auto-commit on session idle
+- Custom tool implementations (bash, edit, grep, etc.)
+
+If you need these features, pin to the last version that includes them:
+
+```json
+{
+  "dependencies": {
+    "@daytona/opencode": "0.167.0"
+  }
+}
+```
+
+> **Note:** v0.167.0 will not receive updates and may break with future OpenCode versions.
+
 ## Development
 
 This plugin is part of the Daytona monorepo.
