@@ -94,6 +94,10 @@ function toEnvVars(env: Record<string, string | undefined>): Record<string, stri
 export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
   const { experimental_workspace, worktree, project } = input
 
+  if (!process.env.DAYTONA_API_KEY) {
+    console.warn('[daytona] DAYTONA_API_KEY is not set - Daytona workspaces will not work')
+  }
+
   const adaptor: WorkspaceAdapter = {
     name: 'Daytona',
     description: 'Create a remote Daytona sandbox workspace',
@@ -105,6 +109,10 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
 
     // Provision a fresh sandbox: upload the repo, install opencode, start `opencode serve`.
     async create(config, env) {
+      if (!process.env.DAYTONA_API_KEY) {
+        throw new Error('DAYTONA_API_KEY environment variable is not set')
+      }
+
       const temp = join(tmpdir(), `opencode-daytona-${Date.now()}`)
       const d = getDaytona()
       const sandbox = await d.create({
@@ -144,7 +152,7 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
 
         await sandbox.fs.uploadFile(tar, 'repo.tgz')
         await run(
-          `rm -rf ${sh(REPO_PATH)} && mkdir -p ${sh(ROOT_PATH)} && tar -xzf "$HOME/repo.tgz" -C "$HOME/workspace"`,
+          `rm -rf ${sh(REPO_PATH)} && mkdir -p ${sh(ROOT_PATH)} && tar -xzf "$HOME/repo.tgz" -C "$HOME/workspace" && rm "$HOME/repo.tgz"`,
         )
 
         await run(
@@ -153,7 +161,11 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
 
         await sandbox.fs.uploadFile(Buffer.from(`${project.id}\n`), `${REPO_PATH}/.git/opencode`)
 
-        const instructions = buildSandboxInstructions({ repoPath: REPO_PATH, sandboxId: sandbox.id })
+        // Derive preview URL template from actual getPreviewLink response to avoid hardcoding the proxy domain.
+        const samplePreview = await sandbox.getPreviewLink(8080)
+        const previewUrlTemplate = samplePreview.url.replace(/^(https?:\/\/)\d+-/, '$1<port>-')
+
+        const instructions = buildSandboxInstructions({ repoPath: REPO_PATH, previewUrlTemplate })
         await sandbox.fs.uploadFile(Buffer.from(instructions), `${REPO_PATH}/.opencode/instructions/daytona.md`)
 
         const opencodeConfig = JSON.stringify(
