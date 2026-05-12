@@ -6,16 +6,16 @@ This document summarizes all known bugs affecting the Daytona OpenCode plugin an
 
 ## Summary Table
 
-| Bug | Severity | Location | GitHub Issue |
-|-----|----------|----------|--------------|
-| [TUI freezes on session resume](#1-tui-freezes-on-session-resume) | High | OpenCode | None found |
-| [Sessions filtered per workspace](#2-sessions-filtered-per-workspace) | Low | OpenCode | None found |
-| [Uncommitted files not synced](#3-uncommitted-files-not-synced-to-new-workspaces) | Medium | Plugin | None found |
-| [Workspace creation errors swallowed](#4-workspace-creation-errors-swallowed) | High | OpenCode | Related: [#21638](https://github.com/sst/opencode/issues/21638), [#24847](https://github.com/sst/opencode/issues/24847) |
-| [Warp session errors swallowed](#5-warp-session-errors-swallowed) | Medium | OpenCode | None found |
-| [Adapter loading errors swallowed](#6-adapter-loading-errors-swallowed) | Low | OpenCode | Related: [#21638](https://github.com/sst/opencode/issues/21638) |
-| [No plugin logging API](#7-no-plugin-logging-api) | Medium | OpenCode | Related: [#20196](https://github.com/sst/opencode/issues/20196) (closed) |
-| [Can't delete empty workspaces](#8-cant-delete-empty-workspaces) | Medium | OpenCode | None found |
+| Bug | Severity | Effort | Location | GitHub Issue |
+|-----|----------|--------|----------|--------------|
+| [TUI freezes on session resume](#1-tui-freezes-on-session-resume) | High | Easy (~10 lines) | OpenCode | None found |
+| [Sessions filtered per workspace](#2-sessions-filtered-per-workspace) | Low | Easy (~5 lines) | OpenCode | None found |
+| [Uncommitted files not synced](#3-uncommitted-files-not-synced-to-new-workspaces) | Medium | Medium (~30 lines) | Plugin | None found |
+| [Workspace creation errors swallowed](#4-workspace-creation-errors-swallowed) | High | Easy (~10 lines) | OpenCode | Related: [#21638](https://github.com/sst/opencode/issues/21638), [#24847](https://github.com/sst/opencode/issues/24847) |
+| [Warp session errors swallowed](#5-warp-session-errors-swallowed) | Medium | Easy (~10 lines) | OpenCode | None found |
+| [Adapter loading errors swallowed](#6-adapter-loading-errors-swallowed) | Low | Easy (~10 lines) | OpenCode | Related: [#21638](https://github.com/sst/opencode/issues/21638) |
+| [No plugin logging API](#7-no-plugin-logging-api) | Medium | Medium (~50 lines) | OpenCode | Related: [#20196](https://github.com/sst/opencode/issues/20196) (closed) |
+| [Can't delete empty workspaces](#8-cant-delete-empty-workspaces) | Medium | Hard (~300 lines) | OpenCode | None found |
 
 ---
 
@@ -66,9 +66,22 @@ function proxyRemote(...) {
 
 ### Suggested Fix
 
-- Wait for workspace sync before loading session data
-- Or retry requests instead of failing immediately
-- Or handle 503 gracefully in TUI (show "Reconnecting...")
+**Simple fix (~10 lines):** Add a retry/wait before returning 503:
+
+```typescript
+// workspace-routing.ts
+const syncing = yield* Workspace.Service.use((svc) => svc.isSyncing(workspace.id))
+if (!syncing) {
+  // Wait up to 5 seconds for sync to establish
+  yield* Effect.sleep("5 seconds")
+  const syncingRetry = yield* Workspace.Service.use((svc) => svc.isSyncing(workspace.id))
+  if (!syncingRetry) {
+    return HttpServerResponse.text(`broken sync connection for workspace: ${workspace.id}`, {
+      status: 503,
+    })
+  }
+}
+```
 
 ### Workaround
 
