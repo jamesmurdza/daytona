@@ -153,7 +153,11 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
 
         await sandbox.fs.uploadFile(Buffer.from(`${project.id}\n`), `${REPO_PATH}/.git/opencode`)
 
-        const instructions = buildSandboxInstructions({ repoPath: REPO_PATH, sandboxId: sandbox.id })
+        // Derive preview URL template from actual getPreviewLink response to avoid hardcoding the proxy domain.
+        const samplePreview = await sandbox.getPreviewLink(8080)
+        const previewUrlTemplate = samplePreview.url.replace(/^(https?:\/\/)\d+-/, '$1<port>-')
+
+        const instructions = buildSandboxInstructions({ repoPath: REPO_PATH, previewUrlTemplate })
         await sandbox.fs.uploadFile(Buffer.from(instructions), `${REPO_PATH}/.opencode/instructions/daytona.md`)
 
         const opencodeConfig = JSON.stringify(

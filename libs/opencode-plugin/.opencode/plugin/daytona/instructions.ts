@@ -5,7 +5,16 @@
 
 // Builds the Daytona-specific instructions dropped into the sandbox's
 // `.opencode/instructions/daytona.md`, which opencode loads via opencode.json.
-export function buildSandboxInstructions({ repoPath, sandboxId }: { repoPath: string; sandboxId: string }): string {
+export function buildSandboxInstructions({
+  repoPath,
+  previewUrlTemplate,
+}: {
+  repoPath: string
+  previewUrlTemplate: string
+}): string {
+  // Build an example URL by replacing <port> with 8000
+  const exampleUrl = previewUrlTemplate.replace('<port>', '8000')
+
   return `## Daytona Sandbox Integration
 This session is integrated with a Daytona sandbox.
 The main project repository is located at: ${repoPath}
@@ -24,11 +33,11 @@ nohup python3 -m http.server 8000 > /tmp/http-server.log 2>&1 &
 Before showing a preview URL, ensure the server is running in the sandbox on that port.
 To access a running server from a browser, use the Daytona proxy URL format:
 \`\`\`
-https://<port>-${sandboxId}.daytonaproxy01.net/
+${previewUrlTemplate}
 \`\`\`
 For example, if a server is running on port 8000:
 \`\`\`
-https://8000-${sandboxId}.daytonaproxy01.net/
+${exampleUrl}
 \`\`\`
 `
 }
