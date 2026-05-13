@@ -7529,7 +7529,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@opencode-ai/plugin@npm:^1.4.11":
+"@opencode-ai/plugin@npm:^1.14.33":
   version: 1.14.48
   resolution: "@opencode-ai/plugin@npm:1.14.48"
   dependencies:
@@ -18359,7 +18359,7 @@ __metadata:
     "@nx/webpack": "npm:21.4.1"
     "@nx/workspace": "npm:21.4.1"
     "@openapitools/openapi-generator-cli": "npm:^2.31.1"
-    "@opencode-ai/plugin": "npm:^1.4.11"
+    "@opencode-ai/plugin": "npm:^1.14.33"
     "@openfeature/core": "npm:^1.9.0"
     "@openfeature/nestjs-sdk": "npm:^0.2.5"
     "@openfeature/react-sdk": "npm:^1.0.1"
