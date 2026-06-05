@@ -34,17 +34,14 @@ pi install npm:@daytona/pi
 
 This extension requires a [Daytona account](https://www.daytona.io/) and [Daytona API key](https://app.daytona.io/dashboard/keys) to create sandboxes.
 
-Set your Daytona API key as an environment variable:
+Set your Daytona API key as an environment variable (e.g. in your shell profile):
 
 ```bash
 export DAYTONA_API_KEY="your-api-key"
 ```
 
-Or create a `.env` file in your project root:
-
-```env
-DAYTONA_API_KEY=your-api-key
-```
+> [!NOTE]
+> Don't put the key in a `.env` file in your project — this extension clones your repo into the sandbox and the agent auto-commits/pushes, so a committed secret could leak. Use a shell/environment variable instead.
 
 The extension also reads these optional variables:
 
