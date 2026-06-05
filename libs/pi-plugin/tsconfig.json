@@ -11,7 +11,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@daytona/sdk": ["libs/sdk-typescript/src/index.ts"]
+    }
   },
   "include": ["index.ts", "src/**/*.ts"]
 }
