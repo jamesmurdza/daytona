@@ -178,17 +178,7 @@ To modify the extension, edit the source files in `libs/pi-plugin`.
 
 #### Run the extension from source
 
-1. **Install the extension's own dependencies** so its runtime imports resolve:
-
-   ```bash
-   cd libs/pi-plugin
-   npm install
-   ```
-
-   > [!IMPORTANT]
-   > This is required even after `yarn install` at the repo root. The monorepo has no Yarn workspaces, so `@daytona/sdk` resolves only through the TypeScript path map (compile time). At **runtime**, Pi/jiti needs `@daytona/sdk` (and the other deps) in `libs/pi-plugin/node_modules` — without this you'll get `Cannot find module '@daytona/sdk'`.
-
-2. **Make sure no other copy is installed.** If you previously ran `pi install …` for this extension, both copies load and collide (`Tool "bash" conflicts with …`). Check and remove it:
+1. **Make sure no other copy is installed.** If you previously ran `pi install …` for this extension, both copies load and collide (`Tool "bash" conflicts with …`). Check and remove it:
 
    ```bash
    pi list                                    # shows installed packages
@@ -199,7 +189,7 @@ To modify the extension, edit the source files in `libs/pi-plugin`.
    > [!IMPORTANT]
    > Load the extension **either** with `-e` (from source, for development) **or** via `pi install` (as a user) — never both at once, or every tool and flag conflicts.
 
-3. **Run Pi against the source** with `--extension` (`-e`):
+2. **Run Pi against the source** with `--extension` (`-e`):
 
    ```bash
    DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-plugin/index.ts --daytona
