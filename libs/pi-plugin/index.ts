@@ -359,7 +359,8 @@ export default function (pi: ExtensionAPI) {
 			const isPublic = pi.getFlag("public") === true;
 
 			const sandbox = await dt.create({
-				name: `pi-${shortId(sessionId)}`,
+				// Full session id for a globally-unique sandbox name (branches stay short).
+				name: `pi-${sessionId}`,
 				snapshot,
 				public: isPublic,
 				// Idle PAUSES the sandbox (filesystem preserved); the next tool call
