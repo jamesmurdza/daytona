@@ -49,11 +49,14 @@ If no key is set and a UI is available, Pi prompts you for one once per session.
 
 ### Running Pi
 
-Start Pi with the `--daytona` flag:
+Start Pi with the `--daytona` flag — from inside a git repository:
 
 ```bash
+cd my-project
 pi --daytona
 ```
+
+When you don't pass `--repo`, the extension **detects the repo you're in** (its `origin` and current branch) and clones that into the sandbox. For a github.com repo it then syncs your work to a per-session `pi/<id>` branch (see [GitHub branch sync](#github-branch-sync)). Pass `--repo` to use a different repository, or run outside a git repo to get a blank workspace.
 
 To check that the extension is working, ask the agent to run `pwd` in the chat. You should see a sandbox path like `/home/daytona`, and a cloud badge in the footer indicating that work is remote:
 
@@ -63,7 +66,7 @@ To check that the extension is working, ask the agent to run `pwd` in the chat. 
 
 #### CLI flags
 
-Work on an existing repo:
+Work on a different repo than the one you're in:
 
 ```bash
 pi --daytona --repo github.com/acme/api --branch dev
@@ -78,8 +81,8 @@ pi --daytona --repo … --public
 | Flag                | Description                                            |
 | ------------------- | ----------------------------------------------------- |
 | `--daytona`         | Run tools inside a Daytona sandbox                     |
-| `--repo <url>`      | Git repo to clone into the sandbox (server-side)      |
-| `--branch <name>`   | Branch to clone (used with `--repo`)                  |
+| `--repo <url>`      | Git repo to clone into the sandbox (defaults to the repo you're in) |
+| `--branch <name>`   | Branch to clone (defaults to your current branch)    |
 | `--snapshot <name>` | Choose a Daytona snapshot / base image                |
 | `--public`          | Create a public sandbox so preview URLs need no token |
 
