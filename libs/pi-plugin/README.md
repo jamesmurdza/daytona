@@ -134,13 +134,6 @@ All network git operations (clone/push) run **inside the sandbox** through Dayto
 | `grep`              | Search file contents inside the sandbox                                         |
 | `preview_url(port)` | Get a public preview URL for a port — the agent calls this after starting a server |
 
-### Backgrounding
-
-Backgrounded processes (`server &`) detach cleanly and don't hang the agent — `bash` returns as soon as the foreground command finishes.
-
-> [!TIP]
-> A command left in the **foreground** (no `&`) that never exits will still block the turn, exactly like in a normal shell — background it or pass a `timeout`.
-
 ## Development
 
 This extension is part of the Daytona monorepo.
