@@ -116,9 +116,6 @@ All network git operations (clone/push) run **inside the sandbox** through Dayto
 > [!NOTE]
 > When you're not in a github.com repo (or `gh` isn't authenticated), push is disabled. The sandbox still gets a local git repo so the agent can commit, but nothing is pushed.
 
-> [!CAUTION]
-> Pushing uses your `gh` token, which is passed to the sandbox as the push credential and is therefore briefly readable by the agent running there. Use a `gh` login scoped no wider than you're comfortable exposing to the repo's working environment.
-
 ### Backgrounding
 
 Daytona's `executeCommand` resolves only when the command's output reaches EOF, so a backgrounded process (`server &`) would normally hold the pipe open and hang the agent. The extension wraps every bash command in a subshell whose combined output is redirected to a temp file, so backgrounded processes detach cleanly and the call returns as soon as the **foreground** finishes.

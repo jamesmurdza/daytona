@@ -85,10 +85,6 @@ All git network operations (clone, push) run **inside the sandbox** via the Dayt
 
 When you're not in a github.com repo (or `gh` isn't authenticated), push is disabled — the sandbox still keeps a local git repo so the agent can commit, but nothing is pushed.
 
-:::caution
-Pushing uses your `gh` token, which is passed to the sandbox as the push credential and is therefore briefly readable by the agent running there.
-:::
-
 ### 8. Slash Commands
 
 Once Pi is running with `--daytona`, you can manage the active sandbox:
