@@ -418,10 +418,12 @@ export default function (pi: ExtensionAPI) {
 					// Clone over HTTPS with the token regardless of the origin's format
 					// (a detected origin may be SSH, which the token can't authenticate).
 					const cloneUrl = `https://github.com/${slug.owner}/${slug.repo}.git`;
+					setStatus(ctx, `☁ daytona · cloning ${slug.owner}/${slug.repo}…`);
 					await sandbox.git.clone(cloneUrl, cwd, branch, undefined, "x-access-token", token);
 					git = { slug, base, branch };
 				} else {
 					// Not a github.com repo, or no gh token: clone read-only, no push.
+					setStatus(ctx, `☁ daytona · cloning ${repoName(repo)}…`);
 					await sandbox.git.clone(normalizeRepoUrl(repo), cwd, stringFlag(pi.getFlag("branch")) ?? detectedBranch);
 					ctx.ui.notify(
 						"Daytona: GitHub sync disabled (needs `gh auth login` and a github.com repo).",
