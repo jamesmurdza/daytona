@@ -4,10 +4,11 @@ This is a Pi extension that runs every Pi tool call inside a Daytona sandbox. Th
 
 ## Features
 
-- Securely isolate Pi's tool execution in a sandbox environment
-- Keeps the agent running on your machine while tools run remotely
+- Runs Pi's tool calls in an isolated Daytona sandbox while the agent stays on your machine
+- Clones the repo you're in (or a `--repo` you pass) into the sandbox automatically
+- Syncs each session to its own GitHub branch — the agent commits, the extension pushes
+- Keeps one sandbox per session and reattaches it when you resume
 - Generates live preview links when a server starts in the sandbox
-- Optionally clones a git repository into the sandbox to start from an existing project
 
 ## Usage
 
@@ -99,6 +100,16 @@ While Pi is running with `--daytona`, you can manage the active sandbox:
 
 The agent runs on your machine. Pi's tool layer is pluggable, so this extension substitutes Daytona-backed implementations of `bash`, `read`, `write`, `edit`, and `ls`, plus dedicated in-sandbox tools for `find` and `grep`. A footer badge is the always-visible signal that work is remote.
 
+### Lifecycle
+
+- **One sandbox per session, kept across runs.** A session's sandbox is recorded and **reattached** when you resume the session — your work and environment persist.
+- **Idle pauses** the sandbox (`autoStopInterval: 5` min). Its filesystem is preserved; resuming transparently restarts it.
+- **Deleted when the session is.** When you delete a session from Pi's resume menu, its sandbox is reaped on the next Pi launch/exit (Pi has no session-deleted hook, so the extension reconciles live sessions against its sandboxes). There is no auto-delete timer — a sandbox lives until its session is gone.
+- **In-memory sessions** (`--blank` / no session) can't be resumed, so their sandbox is deleted on exit.
+
+> [!CAUTION]
+> If the sandbox is ever genuinely gone, tool calls fail with a clear message telling you to restart — they are **never** silently run on your host.
+
 ### GitHub branch sync
 
 If you're in a **github.com** repo and logged in via the GitHub CLI (`gh auth login`), each session gets its own branch and the agent's commits are pushed there automatically. The repo comes from `--repo`, or — when you omit it — is **detected from the git project you launched Pi in** (its `origin` and current branch).
@@ -113,23 +124,6 @@ All network git operations (clone/push) run **inside the sandbox** through Dayto
 > [!NOTE]
 > When you're not in a github.com repo (or `gh` isn't authenticated), push is disabled. The sandbox still gets a local git repo so the agent can commit, but nothing is pushed.
 
-### Backgrounding
-
-Daytona's `executeCommand` resolves only when the command's output reaches EOF, so a backgrounded process (`server &`) would normally hold the pipe open and hang the agent. The extension wraps every bash command in a subshell whose combined output is redirected to a temp file, so backgrounded processes detach cleanly and the call returns as soon as the **foreground** finishes.
-
-> [!TIP]
-> A command left in the **foreground** (no `&`) that never exits will still block the turn, exactly like in a normal shell — background it or pass a `timeout`.
-
-### Lifecycle
-
-- **One sandbox per session, kept across runs.** A session's sandbox is recorded and **reattached** when you resume the session — your work and environment persist.
-- **Idle pauses** the sandbox (`autoStopInterval: 5` min). Its filesystem is preserved; resuming transparently restarts it.
-- **Deleted when the session is.** When you delete a session from Pi's resume menu, its sandbox is reaped on the next Pi launch/exit (Pi has no session-deleted hook, so the extension reconciles live sessions against its sandboxes). There is no auto-delete timer — a sandbox lives until its session is gone.
-- **In-memory sessions** (`--blank` / no session) can't be resumed, so their sandbox is deleted on exit.
-
-> [!CAUTION]
-> If the sandbox is ever genuinely gone, tool calls fail with a clear message telling you to restart — they are **never** silently run on your host.
-
 ### Tools
 
 | Tool                | What it does                                                                    |
@@ -142,6 +136,13 @@ Daytona's `executeCommand` resolves only when the command's output reaches EOF, 
 | `find`              | Find files by glob inside the sandbox (gitignore-aware, supports path globs)    |
 | `grep`              | Search file contents inside the sandbox                                         |
 | `preview_url(port)` | Get a public preview URL for a port — the agent calls this after starting a server |
+
+### Backgrounding
+
+Backgrounded processes (`server &`) detach cleanly and don't hang the agent — `bash` returns as soon as the foreground command finishes.
+
+> [!TIP]
+> A command left in the **foreground** (no `&`) that never exits will still block the turn, exactly like in a normal shell — background it or pass a `timeout`.
 
 ## Development
 
@@ -187,10 +188,11 @@ To modify the extension, edit the source files in `libs/pi-plugin`.
 #### Type-check, smoke, and live tests
 
 ```bash
-npx nx run pi-plugin:type-check   # type-check (from the repo root)
+npx nx run pi-plugin:type-check   # type-check (from the repo root; needs the monorepo installed)
 
 cd libs/pi-plugin
-npm run check                     # offline: type-check + load smoke (no API key/network)
+npm install                       # the lib's own deps, for the commands below
+npm run smoke                     # offline: load the extension and check it registers (no API key/network)
 npm run test:live                 # end-to-end against real Daytona (needs DAYTONA_API_KEY)
 ```
 
@@ -216,11 +218,11 @@ libs/pi-plugin/
 │   ├── find-tool.ts    # In-sandbox find (ripgrep/find)
 │   ├── grep-tool.ts    # In-sandbox grep (ripgrep/grep)
 │   ├── github.ts       # Host gh control-plane (token + GitHub API)
-│   ├── sync.ts         # Sandbox-side commit + push (Daytona git API)
+│   ├── sync.ts         # Sandbox-side git push (Daytona git API)
 │   └── util.ts         # Small shared helpers
 ├── scripts/            # Offline smoke + live integration tests
 ├── package.json        # Package metadata (includes the "pi" extensions field)
-├── project.json        # Nx build configuration
+├── project.json        # Nx project configuration
 ├── tsconfig.json       # TypeScript config
 └── README.md
 ```
