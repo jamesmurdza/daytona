@@ -372,12 +372,15 @@ export default function (pi: ExtensionAPI) {
 				}
 			} else {
 				// No --repo: still create a throwaway git repo in the sandbox for
-				// consistency (the agent's work is committed, just never pushed).
+				// consistency (the agent's work is committed, just never pushed). The
+				// initial empty commit gives HEAD a valid ref, so git.status() doesn't
+				// fail with "reference not found" on the first sync.
 				cwd = joinPath(home, "workspace");
 				await execCommand(
 					sandbox,
 					`mkdir -p ${shellQuote(cwd)} && cd ${shellQuote(cwd)} && git init -q -b pi && ` +
-						`git config user.name "pi-daytona" && git config user.email "pi@daytona.io"`,
+						`git config user.name "pi-daytona" && git config user.email "pi@daytona.io" && ` +
+						`git commit -q --allow-empty -m "pi: init"`,
 					home,
 				);
 			}
