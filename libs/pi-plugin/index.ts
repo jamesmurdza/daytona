@@ -342,10 +342,10 @@ export default function (pi: ExtensionAPI) {
 				const token = slug ? await getGithubToken(pi) : undefined;
 
 				if (slug && token) {
-					// Each session gets its own GitHub branch pi/<sessionId>. We create
+					// Each session gets its own GitHub branch pi/<short-session-id>. We create
 					// the ref on GitHub first (off the base), then clone that branch so
 					// the sandbox has an upstream to push back to (see sync.ts).
-					const branch = `pi/${ctx.sessionManager.getSessionId()}`;
+					const branch = `pi/${shortId(ctx.sessionManager.getSessionId())}`;
 					let base = stringFlag(pi.getFlag("branch"));
 					// A fork branches off the parent session's branch.
 					if (event.reason === "fork") {
