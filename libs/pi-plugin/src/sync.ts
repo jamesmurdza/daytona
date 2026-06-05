@@ -4,62 +4,48 @@
  */
 
 /**
- * Sandbox-side git sync: commit the agent's work and push it to the session's
- * GitHub branch using the Daytona git API. Every network git operation runs
- * INSIDE the sandbox; the GitHub token is passed transiently as the push
- * credential. Pushes are serialized so overlapping agent_end events can't race
- * on the same repo, and an unchanged tree is skipped (no empty commits/pushes).
+ * Sandbox-side git push.
+ *
+ * The agent commits its own work inside the sandbox (it's prompted to commit but
+ * not push). The extension only pushes those commits to the session's GitHub
+ * branch via the Daytona git API, using a transient token as the credential.
+ * Pushes are serialized so overlapping triggers can't race, and a branch with
+ * nothing ahead of its remote is skipped.
  */
 
 import type { Sandbox } from "@daytona/sdk";
 import { withRecovery } from "./sandbox.ts";
 
-const COMMIT_AUTHOR = "pi-daytona";
-const COMMIT_EMAIL = "pi@daytona.io";
 const PUSH_USERNAME = "x-access-token";
 
-export interface SyncTarget {
+export interface PushTarget {
 	sandbox: Sandbox;
 	cwd: string;
-	/** True when a GitHub origin and token are available (otherwise commit-only). */
+	/** True when a GitHub origin and token are available (otherwise a no-op). */
 	pushEnabled: boolean;
 }
 
-export interface SyncResult {
-	committed: boolean;
+export interface PushResult {
 	pushed: boolean;
 }
 
-// Serialize syncs across the whole extension so concurrent triggers don't race.
+// Serialize pushes across the whole extension so concurrent triggers don't race.
 let queue: Promise<unknown> = Promise.resolve();
 
-export function commitAndPush(target: SyncTarget, token: string | undefined): Promise<SyncResult> {
-	const next = queue.then(() => doCommitAndPush(target, token));
-	queue = next.catch(() => {}); // keep the chain alive even if one sync throws
+export function pushChanges(target: PushTarget, token: string | undefined): Promise<PushResult> {
+	const next = queue.then(() => doPush(target, token));
+	queue = next.catch(() => {}); // keep the chain alive even if one push throws
 	return next;
 }
 
-async function doCommitAndPush(target: SyncTarget, token: string | undefined): Promise<SyncResult> {
+async function doPush(target: PushTarget, token: string | undefined): Promise<PushResult> {
+	if (!target.pushEnabled || !token) return { pushed: false };
+
 	const { sandbox, cwd } = target;
-
 	const status = await withRecovery(sandbox, () => sandbox.git.status(cwd));
-	const hasChanges = (status.fileStatus?.length ?? 0) > 0;
-
-	let committed = false;
-	if (hasChanges) {
-		await withRecovery(sandbox, () => sandbox.git.add(cwd, ["."]));
-		await withRecovery(sandbox, () =>
-			sandbox.git.commit(cwd, `pi: ${new Date().toISOString()}`, COMMIT_AUTHOR, COMMIT_EMAIL),
-		);
-		committed = true;
-	}
-
-	if (!target.pushEnabled || !token) return { committed, pushed: false };
-
-	// Nothing new to push: no fresh commit and nothing already ahead of remote.
-	const ahead = status.ahead ?? 0;
-	if (!committed && ahead === 0) return { committed, pushed: false };
+	// Nothing to push: no local commits ahead of the remote branch.
+	if ((status.ahead ?? 0) <= 0) return { pushed: false };
 
 	await withRecovery(sandbox, () => sandbox.git.push(cwd, PUSH_USERNAME, token));
-	return { committed, pushed: true };
+	return { pushed: true };
 }

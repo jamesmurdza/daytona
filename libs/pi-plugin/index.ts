@@ -42,6 +42,7 @@ import {
 	type RepoSlug,
 	compareUrl,
 	deleteBranch,
+	detectLocalRepo,
 	ensureBranch,
 	getBranchSha,
 	getDefaultBranch,
@@ -49,7 +50,7 @@ import {
 	mergeBranch,
 	parseRepoSlug,
 } from "./src/github.ts";
-import { commitAndPush } from "./src/sync.ts";
+import { pushChanges } from "./src/sync.ts";
 
 /** Session custom-entry type recording the sandbox bound to this session. */
 const SESSION_ENTRY = "daytona-session";
@@ -275,9 +276,9 @@ export default function (pi: ExtensionAPI) {
 				);
 				if (!ok) return;
 				try {
-					// Push the latest work first so the merge includes it.
+					// Push the agent's latest commits first so the merge includes them.
 					const token = await getGithubToken(pi);
-					await commitAndPush({ sandbox, cwd, pushEnabled: true }, token);
+					await pushChanges({ sandbox, cwd, pushEnabled: true }, token);
 					const res = await mergeBranch(pi, slug, base, branch);
 					if (!res.ok) {
 						ctx.ui.notify(`Merge failed: ${res.message}`, "error");
@@ -368,14 +369,29 @@ export default function (pi: ExtensionAPI) {
 			});
 
 			const home = (await sandbox.getUserHomeDir()) ?? "/home/daytona";
+			// Temporary git identity so the agent's commits (and our init commit) just work.
+			await execCommand(
+				sandbox,
+				`git config --global user.name "pi-agent" && git config --global user.email "agent@pi.daytona"`,
+				home,
+			);
 			let cwd = home;
 			let git: GitTarget | undefined;
 
-			const repo = stringFlag(pi.getFlag("repo"));
+			// Use --repo if given; otherwise fall back to the git repo you launched Pi in.
+			let repo = stringFlag(pi.getFlag("repo"));
+			let detectedBranch: string | undefined;
+			if (!repo) {
+				const local = await detectLocalRepo(pi, ctx.sessionManager.getCwd());
+				if (local) {
+					repo = local.url;
+					detectedBranch = local.branch || undefined;
+				}
+			}
+
 			if (repo) {
-				const url = normalizeRepoUrl(repo);
 				cwd = joinPath(home, repoName(repo));
-				const slug = parseRepoSlug(url);
+				const slug = parseRepoSlug(normalizeRepoUrl(repo));
 				const token = slug ? await getGithubToken(pi) : undefined;
 
 				if (slug && token) {
@@ -389,32 +405,33 @@ export default function (pi: ExtensionAPI) {
 						const parent = latestSessionEntry(ctx);
 						if (parent?.git) base = parent.git.branch;
 					}
+					if (!base) base = detectedBranch; // the branch you're on locally
 					if (!base) base = await getDefaultBranch(pi, slug);
 					if (!base) throw new Error("Could not resolve a base branch on GitHub.");
 
 					const sha = await getBranchSha(pi, slug, base);
 					if (!sha) throw new Error(`Base branch '${base}' not found on GitHub.`);
 					await ensureBranch(pi, slug, branch, sha);
-					await sandbox.git.clone(url, cwd, branch, undefined, "x-access-token", token);
+					// Clone over HTTPS with the token regardless of the origin's format
+					// (a detected origin may be SSH, which the token can't authenticate).
+					const cloneUrl = `https://github.com/${slug.owner}/${slug.repo}.git`;
+					await sandbox.git.clone(cloneUrl, cwd, branch, undefined, "x-access-token", token);
 					git = { slug, base, branch };
 				} else {
 					// Not a github.com repo, or no gh token: clone read-only, no push.
-					await sandbox.git.clone(url, cwd, stringFlag(pi.getFlag("branch")));
+					await sandbox.git.clone(normalizeRepoUrl(repo), cwd, stringFlag(pi.getFlag("branch")) ?? detectedBranch);
 					ctx.ui.notify(
-						"Daytona: GitHub sync disabled (needs `gh auth login` and a github.com --repo).",
+						"Daytona: GitHub sync disabled (needs `gh auth login` and a github.com repo).",
 						"warning",
 					);
 				}
 			} else {
-				// No --repo: still create a throwaway git repo in the sandbox for
-				// consistency (the agent's work is committed, just never pushed). The
-				// initial empty commit gives HEAD a valid ref, so git.status() doesn't
-				// fail with "reference not found" on the first sync.
+				// Not in a git repo: throwaway local repo so the agent can still commit
+				// (never pushed). The initial empty commit gives HEAD a valid ref.
 				cwd = joinPath(home, "workspace");
 				await execCommand(
 					sandbox,
 					`mkdir -p ${shellQuote(cwd)} && cd ${shellQuote(cwd)} && git init -q -b pi && ` +
-						`git config user.name "pi-daytona" && git config user.email "pi@daytona.io" && ` +
 						`git commit -q --allow-empty -m "pi: init"`,
 					home,
 				);
@@ -444,26 +461,30 @@ export default function (pi: ExtensionAPI) {
 	pi.on("before_agent_start", (event) => {
 		if (!active) return;
 		const replacement = `Current working directory: ${active.cwd} (inside Daytona sandbox ${shortId(active.sandbox.id)})`;
-		const systemPrompt = event.systemPrompt.replace(/Current working directory: .*/g, replacement);
+		let systemPrompt = event.systemPrompt.replace(/Current working directory: .*/g, replacement);
+		systemPrompt +=
+			"\n\nThis project is a git repository inside a Daytona sandbox. After you finish a unit of " +
+			"work, commit it with git (e.g. `git add -A && git commit -m \"...\"`). Do not push — " +
+			"pushing is handled automatically.";
 		return { systemPrompt };
 	});
 
-	// After each agent loop ends, commit the work and push it to the session's
-	// GitHub branch (commit-only when no --repo). The push is serialized and
-	// skips an unchanged tree (see sync.ts).
+	// After each agent loop ends, push any commits the agent made to the session's
+	// GitHub branch. We don't commit here — the agent commits its own work. The
+	// push is serialized and skips a branch with nothing ahead of its remote.
 	pi.on("agent_end", async (_event, ctx) => {
-		if (!active) return;
-		const token = active.git ? await getGithubToken(pi) : undefined;
+		if (!active?.git) return;
 		try {
-			const res = await commitAndPush({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: !!active.git }, token);
-			if (res.pushed && active.git) {
+			const token = await getGithubToken(pi);
+			const res = await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: true }, token);
+			if (res.pushed) {
 				ctx.ui.notify(
 					`Pushed ${active.git.branch} → ${compareUrl(active.git.slug, active.git.base, active.git.branch)}`,
 					"info",
 				);
 			}
 		} catch (err) {
-			ctx.ui.notify(`Daytona: sync failed — ${errorMessage(err)}`, "warning");
+			ctx.ui.notify(`Daytona: push failed — ${errorMessage(err)}`, "warning");
 		}
 	});
 
@@ -477,11 +498,14 @@ export default function (pi: ExtensionAPI) {
 		const current = active;
 		active = null;
 		setStatus(ctx, undefined);
-		try {
-			const token = current.git ? await getGithubToken(pi) : undefined;
-			await commitAndPush({ sandbox: current.sandbox, cwd: current.cwd, pushEnabled: !!current.git }, token);
-		} catch {
-			// best-effort final sync
+		// Final push so the agent's last commits land on GitHub before the sandbox pauses.
+		if (current.git) {
+			try {
+				const token = await getGithubToken(pi);
+				await pushChanges({ sandbox: current.sandbox, cwd: current.cwd, pushEnabled: true }, token);
+			} catch {
+				// best-effort final push
+			}
 		}
 
 		const persisted = ctx.sessionManager.getSessionFile() !== undefined;

@@ -20,6 +20,28 @@ export interface RepoSlug {
 	repo: string;
 }
 
+/**
+ * Detect the git origin URL and current branch of a local checkout (the host
+ * Pi project directory), so a session launched without --repo still syncs to
+ * the repo you're sitting in. Returns undefined if it isn't a git repo with an
+ * origin remote.
+ */
+export async function detectLocalRepo(
+	pi: ExtensionAPI,
+	cwd: string,
+): Promise<{ url: string; branch: string } | undefined> {
+	try {
+		const remote = await pi.exec("git", ["-C", cwd, "remote", "get-url", "origin"]);
+		const url = remote.code === 0 ? remote.stdout.trim() : "";
+		if (!url) return undefined;
+		const head = await pi.exec("git", ["-C", cwd, "rev-parse", "--abbrev-ref", "HEAD"]);
+		const branch = head.code === 0 ? head.stdout.trim() : "";
+		return { url, branch: branch && branch !== "HEAD" ? branch : "" };
+	} catch {
+		return undefined;
+	}
+}
+
 /** Parse `owner/repo` from a normalized GitHub URL. Undefined if it isn't github.com. */
 export function parseRepoSlug(url: string): RepoSlug | undefined {
 	const m = url.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);

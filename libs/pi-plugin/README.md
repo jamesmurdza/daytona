@@ -104,17 +104,17 @@ The agent runs on your machine. Pi's tool layer is pluggable, so this extension 
 
 ### GitHub branch sync
 
-When you launch with `--repo` pointing at a **github.com** repo and you're logged in via the GitHub CLI (`gh auth login`), each session gets its own branch and the agent's work is pushed there automatically:
+If you're in a **github.com** repo and logged in via the GitHub CLI (`gh auth login`), each session gets its own branch and the agent's commits are pushed there automatically. The repo comes from `--repo`, or — when you omit it — is **detected from the git project you launched Pi in** (its `origin` and current branch).
 
-- On start, the extension creates `pi/<sessionId>` on GitHub (off your base branch, or `--branch`) and clones it into the sandbox.
-- After every agent turn (and once more on exit), it commits and pushes the changes to that branch via the Daytona git API. Unchanged trees are skipped.
+- On start, the extension creates `pi/<short-session-id>` on GitHub (off your current branch, or `--branch`) and clones it into the sandbox over HTTPS.
+- The agent **commits its own work** — it's prompted to commit after making changes, and not to push. After each turn (and once more on exit) the extension pushes those commits to the branch via the Daytona git API. A branch with nothing new is skipped.
 - `/sandbox view` gives you the compare/PR link; `/sandbox merge` merges the branch into its base and deletes it.
 - **Forks** start a fresh sandbox and branch off the parent session's branch.
 
-All network git operations (clone/commit/push) run **inside the sandbox** through Daytona; the host only uses `gh` to mint a token and call the GitHub API.
+All network git operations (clone/push) run **inside the sandbox** through Daytona; the host only uses `gh` to mint a token and call the GitHub API. A temporary git identity is configured in the sandbox so commits work out of the box.
 
 > [!NOTE]
-> Without `--repo` (or without `gh` auth, or for a non-GitHub remote), push is disabled. The sandbox still gets a local git repo and commits the agent's work for consistency — it's just never pushed.
+> When you're not in a github.com repo (or `gh` isn't authenticated), push is disabled. The sandbox still gets a local git repo so the agent can commit, but nothing is pushed.
 
 > [!CAUTION]
 > Pushing uses your `gh` token, which is passed to the sandbox as the push credential and is therefore briefly readable by the agent running there. Use a `gh` login scoped no wider than you're comfortable exposing to the repo's working environment.
