@@ -137,10 +137,22 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
 		},
 	});
 
-	// Route user `!` bash commands to the sandbox too.
+	// Route user `!` bash commands to the sandbox. When --daytona is set but no
+	// sandbox is available, return an error result so the command is NOT run on the
+	// host. With --daytona off, return undefined to let Pi run it locally.
 	pi.on("user_bash", () => {
 		const active = getActive();
-		if (!active) return;
-		return { operations: createBashOps(active.sandbox) };
+		if (active) return { operations: createBashOps(active.sandbox) };
+		if (pi.getFlag("daytona") === true) {
+			return {
+				result: {
+					output: "Daytona sandbox is unavailable — the command was NOT run on your host. Restart Pi.",
+					exitCode: 1,
+					cancelled: false,
+					truncated: false,
+				},
+			};
+		}
+		return;
 	});
 }
