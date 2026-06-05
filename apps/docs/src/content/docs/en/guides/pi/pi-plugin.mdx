@@ -73,16 +73,34 @@ For example, to start working on an existing repository:
 pi --daytona --repo github.com/acme/api --branch dev
 ```
 
-### 7. Slash Commands
+### 7. Sync Work to GitHub
 
-Once Pi is running with `--daytona`, you can inspect the active sandbox:
+When you launch with `--repo` pointing at a **github.com** repository and you're authenticated with the [GitHub CLI](https://cli.github.com/) (`gh auth login`), the extension syncs each session to its own GitHub branch:
 
-- `/sandbox status` — show the sandbox id, state, working directory, snapshot, and visibility
+1. On start, it creates `pi/<sessionId>` on GitHub (off your base branch, or the one given with `--branch`) and clones it into the sandbox.
+2. After each agent turn — and once more when you exit — it commits the agent's changes and pushes them to that branch. Unchanged trees are skipped.
+3. Forks start a fresh sandbox and branch off the parent session's branch.
+
+All git network operations (clone, commit, push) run **inside the sandbox** via the Daytona git API. The host only uses `gh` to mint a token and call the GitHub REST API. Because the work lives durably on GitHub, the sandbox stays fully ephemeral.
+
+Without `--repo` (or `gh` auth, or for a non-GitHub remote), push is disabled — the sandbox still keeps a local git repo and commits for consistency, but nothing is pushed.
+
+:::caution
+Pushing uses your `gh` token, which is passed to the sandbox as the push credential and is therefore briefly readable by the agent running there.
+:::
+
+### 8. Slash Commands
+
+Once Pi is running with `--daytona`, you can manage the active sandbox:
+
+- `/sandbox status` — show the sandbox id, state, working directory, branch, snapshot, and visibility
 - `/sandbox url <port>` — get a preview URL for a port served inside the sandbox
+- `/sandbox view` — print the GitHub compare/PR URL for this session's branch
+- `/sandbox merge` — merge this session's branch into its base on GitHub, then delete it
 
 The agent can also call the `preview_url(port)` tool itself — after it starts a dev server, it can hand you a clickable link without you running `/sandbox url`.
 
-### 8. How It Works
+### 9. How It Works
 
 Pi's tool layer is pluggable, so the extension substitutes Daytona-backed implementations of `bash`, `read`, `write`, `edit`, and `ls`, plus dedicated in-sandbox tools for `find` and `grep`. Tool calls run in the sandbox over the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk); if the sandbox becomes unavailable, calls fail with a clear message rather than silently running on your host.
 

@@ -35,14 +35,38 @@ import {
 	createReadOps,
 	createWriteOps,
 } from "./src/ops.ts";
-import { withRecovery } from "./src/sandbox.ts";
-import { joinPath, normalizeRepoUrl, repoName, shortId } from "./src/util.ts";
+import { execCommand, withRecovery } from "./src/sandbox.ts";
+import { joinPath, normalizeRepoUrl, repoName, shellQuote, shortId } from "./src/util.ts";
+import {
+	type RepoSlug,
+	compareUrl,
+	deleteBranch,
+	ensureBranch,
+	getBranchSha,
+	getDefaultBranch,
+	getGithubToken,
+	mergeBranch,
+	parseRepoSlug,
+} from "./src/github.ts";
+import { commitAndPush } from "./src/sync.ts";
+
+/** Session custom-entry type recording the GitHub branch for this session. */
+const BRANCH_ENTRY = "daytona-pi-branch";
+
+interface BranchEntryData {
+	branch: string;
+	base: string;
+	owner: string;
+	repo: string;
+}
 
 /** State for the sandbox bound to the current session. */
 interface ActiveSandbox {
 	sandbox: Sandbox;
-	/** Working directory inside the sandbox (repo root, or home when no --repo). */
+	/** Working directory inside the sandbox (repo root, or workspace when no --repo). */
 	cwd: string;
+	/** GitHub sync target — set only when --repo is a github.com repo and gh has a token. */
+	git?: { slug: RepoSlug; base: string; branch: string };
 }
 
 export default function (pi: ExtensionAPI) {
@@ -181,9 +205,9 @@ export default function (pi: ExtensionAPI) {
 	// --- Informational commands (read-only; don't change the backend) ---
 
 	pi.registerCommand("sandbox", {
-		description: "Inspect the active Daytona sandbox: status | url <port>",
+		description: "Manage the active Daytona sandbox: status | url <port> | view | merge",
 		getArgumentCompletions: (prefix) => {
-			const subs = ["status", "url"];
+			const subs = ["status", "url", "view", "merge"];
 			const matches = subs.filter((s) => s.startsWith(prefix.trim()));
 			return matches.length > 0 ? matches.map((s) => ({ value: s, label: s })) : null;
 		},
@@ -219,6 +243,44 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
+			if (sub === "view") {
+				if (!active.git) {
+					ctx.ui.notify("No GitHub branch for this session. Launch Pi with --repo.", "warning");
+					return;
+				}
+				const { slug, base, branch } = active.git;
+				ctx.ui.notify(`${branch}: ${compareUrl(slug, base, branch)}`, "info");
+				return;
+			}
+
+			if (sub === "merge") {
+				if (!active.git) {
+					ctx.ui.notify("Merge needs a GitHub repo. Launch Pi with --repo.", "warning");
+					return;
+				}
+				const { slug, base, branch } = active.git;
+				const ok = await ctx.ui.confirm(
+					"Merge branch",
+					`Merge ${branch} into ${base}? This does a direct GitHub merge (merge commit) and deletes the branch.`,
+				);
+				if (!ok) return;
+				try {
+					// Push the latest work first so the merge includes it.
+					const token = await getGithubToken(pi);
+					await commitAndPush({ sandbox, cwd, pushEnabled: true }, token);
+					const res = await mergeBranch(pi, slug, base, branch);
+					if (!res.ok) {
+						ctx.ui.notify(`Merge failed: ${res.message}`, "error");
+						return;
+					}
+					await deleteBranch(pi, slug, branch);
+					ctx.ui.notify(`Merged ${branch} into ${base} ✓`, "info");
+				} catch (err) {
+					ctx.ui.notify(`Merge failed: ${errorMessage(err)}`, "error");
+				}
+				return;
+			}
+
 			// Default subcommand: status.
 			try {
 				await sandbox.refreshData();
@@ -228,8 +290,9 @@ export default function (pi: ExtensionAPI) {
 			const state = sandbox.state ?? "unknown";
 			const visibility = sandbox.public ? "public" : "private";
 			const snapshot = sandbox.snapshot ? ` · ${sandbox.snapshot}` : "";
+			const branch = active.git ? ` · ${active.git.branch}` : "";
 			ctx.ui.notify(
-				`☁ ${shortId(sandbox.id)} · ${state} · ${cwd}${snapshot} · ${visibility}`,
+				`☁ ${shortId(sandbox.id)} · ${state} · ${cwd}${branch}${snapshot} · ${visibility}`,
 				"info",
 			);
 		},
@@ -237,7 +300,7 @@ export default function (pi: ExtensionAPI) {
 
 	// --- Lifecycle ---
 
-	pi.on("session_start", async (_event, ctx) => {
+	pi.on("session_start", async (event, ctx) => {
 		if (pi.getFlag("daytona") !== true) return;
 		if (active) return; // already running (e.g. after reload)
 
@@ -269,19 +332,61 @@ export default function (pi: ExtensionAPI) {
 
 			const home = (await sandbox.getUserHomeDir()) ?? "/home/daytona";
 			let cwd = home;
+			let git: ActiveSandbox["git"];
 
 			const repo = stringFlag(pi.getFlag("repo"));
 			if (repo) {
 				const url = normalizeRepoUrl(repo);
 				cwd = joinPath(home, repoName(repo));
-				const branch = stringFlag(pi.getFlag("branch"));
-				await sandbox.git.clone(url, cwd, branch);
+				const slug = parseRepoSlug(url);
+				const token = slug ? await getGithubToken(pi) : undefined;
+
+				if (slug && token) {
+					// Each session gets its own GitHub branch pi/<sessionId>. We create
+					// the ref on GitHub first (off the base), then clone that branch so
+					// the sandbox has an upstream to push back to (see sync.ts).
+					const branch = `pi/${ctx.sessionManager.getSessionId()}`;
+					let base = stringFlag(pi.getFlag("branch"));
+					// A fork branches off the parent session's branch.
+					if (event.reason === "fork") {
+						const parent = latestBranchEntry(ctx);
+						if (parent) base = parent.branch;
+					}
+					if (!base) base = await getDefaultBranch(pi, slug);
+					if (!base) throw new Error("Could not resolve a base branch on GitHub.");
+
+					const sha = await getBranchSha(pi, slug, base);
+					if (!sha) throw new Error(`Base branch '${base}' not found on GitHub.`);
+					await ensureBranch(pi, slug, branch, sha);
+					await sandbox.git.clone(url, cwd, branch, undefined, "x-access-token", token);
+					git = { slug, base, branch };
+					const data: BranchEntryData = { branch, base, owner: slug.owner, repo: slug.repo };
+					pi.appendEntry(BRANCH_ENTRY, data);
+				} else {
+					// Not a github.com repo, or no gh token: clone read-only, no push.
+					await sandbox.git.clone(url, cwd, stringFlag(pi.getFlag("branch")));
+					ctx.ui.notify(
+						"Daytona: GitHub sync disabled (needs `gh auth login` and a github.com --repo).",
+						"warning",
+					);
+				}
+			} else {
+				// No --repo: still create a throwaway git repo in the sandbox for
+				// consistency (the agent's work is committed, just never pushed).
+				cwd = joinPath(home, "workspace");
+				await execCommand(
+					sandbox,
+					`mkdir -p ${shellQuote(cwd)} && cd ${shellQuote(cwd)} && git init -q -b pi && ` +
+						`git config user.name "pi-daytona" && git config user.email "pi@daytona.io"`,
+					home,
+				);
 			}
 
-			active = { sandbox, cwd };
+			active = { sandbox, cwd, git };
 
 			const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
-			ctx.ui.notify(`Sandbox ready · ${shortId(sandbox.id)} · ${secs}s`, "info");
+			const branchInfo = git ? ` · ${git.branch}` : "";
+			ctx.ui.notify(`Sandbox ready · ${shortId(sandbox.id)}${branchInfo} · ${secs}s`, "info");
 			setRunningStatus(ctx, sandbox.id, cwd);
 		} catch (err) {
 			active = null;
@@ -300,19 +405,58 @@ export default function (pi: ExtensionAPI) {
 		return { systemPrompt };
 	});
 
-	// Tear down the sandbox on exit (it's ephemeral to the session).
+	// After each agent loop ends, commit the work and push it to the session's
+	// GitHub branch (commit-only when no --repo). The push is serialized and
+	// skips an unchanged tree (see sync.ts).
+	pi.on("agent_end", async (_event, ctx) => {
+		if (!active) return;
+		const token = active.git ? await getGithubToken(pi) : undefined;
+		try {
+			const res = await commitAndPush({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: !!active.git }, token);
+			if (res.pushed && active.git) {
+				ctx.ui.notify(
+					`Pushed ${active.git.branch} → ${compareUrl(active.git.slug, active.git.base, active.git.branch)}`,
+					"info",
+				);
+			}
+		} catch (err) {
+			ctx.ui.notify(`Daytona: sync failed — ${errorMessage(err)}`, "warning");
+		}
+	});
+
+	// Tear down the sandbox on exit (it's ephemeral to the session). The agent's
+	// work is durable on GitHub, so deletion is safe — but flush a final sync
+	// first to capture the last turn before the sandbox goes away.
 	pi.on("session_shutdown", async (event, ctx) => {
 		if (!active) return;
 		if (event.reason !== "quit" && event.reason !== "reload") return;
-		const { sandbox } = active;
+		const current = active;
 		active = null;
 		setStatus(ctx, undefined);
 		try {
-			await sandbox.delete();
+			const token = current.git ? await getGithubToken(pi) : undefined;
+			await commitAndPush({ sandbox: current.sandbox, cwd: current.cwd, pushEnabled: !!current.git }, token);
+		} catch {
+			// best-effort final sync
+		}
+		try {
+			await current.sandbox.delete();
 		} catch {
 			// Best-effort: autoStop + autoDelete reap it later if this didn't run.
 		}
 	});
+}
+
+/** Most recent GitHub branch recorded in this session (used to fork off a parent's branch). */
+function latestBranchEntry(ctx: ExtensionContext): BranchEntryData | undefined {
+	const entries = ctx.sessionManager.getEntries();
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const e = entries[i] as { type?: string; customType?: string; data?: unknown };
+		if (e.type === "custom" && e.customType === BRANCH_ENTRY) {
+			return e.data as BranchEntryData;
+		}
+	}
+	return undefined;
 }
 
 // --- helpers ---

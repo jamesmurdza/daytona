@@ -91,14 +91,35 @@ pi --daytona --repo … --public
 
 #### Slash commands
 
-While Pi is running with `--daytona`, you can inspect the active sandbox:
+While Pi is running with `--daytona`, you can manage the active sandbox:
 
-- `/sandbox status` — id, state, working directory, snapshot, and visibility
+- `/sandbox status` — id, state, working directory, branch, snapshot, and visibility
 - `/sandbox url <port>` — get a preview URL for a port served inside the sandbox
+- `/sandbox view` — print the GitHub compare/PR URL for this session's branch
+- `/sandbox merge` — merge this session's branch into its base on GitHub, then delete it
 
 ## How It Works
 
 The agent runs on your machine. Pi's tool layer is pluggable, so this extension substitutes Daytona-backed implementations of `bash`, `read`, `write`, `edit`, and `ls`, plus dedicated in-sandbox tools for `find` and `grep`. A footer badge is the always-visible signal that work is remote.
+
+### GitHub branch sync
+
+When you launch with `--repo` pointing at a **github.com** repo and you're logged in via the GitHub CLI (`gh auth login`), each session gets its own branch and the agent's work is pushed there automatically:
+
+- On start, the extension creates `pi/<sessionId>` on GitHub (off your base branch, or `--branch`) and clones it into the sandbox.
+- After every agent turn (and once more on exit), it commits and pushes the changes to that branch via the Daytona git API. Unchanged trees are skipped.
+- `/sandbox view` gives you the compare/PR link; `/sandbox merge` merges the branch into its base and deletes it.
+- **Forks** start a fresh sandbox and branch off the parent session's branch.
+
+Because the work lives durably on GitHub, the sandbox stays fully ephemeral — it's deleted on exit.
+
+All network git operations (clone/commit/push) run **inside the sandbox** through Daytona; the host only uses `gh` to mint a token and call the GitHub API.
+
+> [!NOTE]
+> Without `--repo` (or without `gh` auth, or for a non-GitHub remote), push is disabled. The sandbox still gets a local git repo and commits the agent's work for consistency — it's just never pushed.
+
+> [!CAUTION]
+> Pushing uses your `gh` token, which is passed to the sandbox as the push credential and is therefore briefly readable by the agent running there. Use a `gh` login scoped no wider than you're comfortable exposing to the repo's working environment.
 
 ### Backgrounding
 
@@ -203,6 +224,8 @@ libs/pi-plugin/
 │   ├── ops.ts          # Daytona-backed bash/read/write/edit/ls operations
 │   ├── find-tool.ts    # In-sandbox find (ripgrep/find)
 │   ├── grep-tool.ts    # In-sandbox grep (ripgrep/grep)
+│   ├── github.ts       # Host gh control-plane (token + GitHub API)
+│   ├── sync.ts         # Sandbox-side commit + push (Daytona git API)
 │   └── util.ts         # Small shared helpers
 ├── scripts/            # Offline smoke + live integration tests
 ├── package.json        # Package metadata (includes the "pi" extensions field)

@@ -47,7 +47,7 @@ factory(stubPi);
 
 const expectedFlags = ["daytona", "repo", "branch", "snapshot", "public"];
 const expectedTools = ["bash", "read", "write", "edit", "ls", "find", "grep", "preview_url"];
-const expectedEvents = ["user_bash", "session_start", "before_agent_start", "session_shutdown"];
+const expectedEvents = ["user_bash", "session_start", "before_agent_start", "agent_end", "session_shutdown"];
 const expectedCommands = ["sandbox"];
 
 function assertContains(label, actual, expected) {
