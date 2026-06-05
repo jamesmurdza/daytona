@@ -176,41 +176,43 @@ To modify the extension, edit the source files in `libs/pi-plugin`.
 > [!NOTE]
 > Because Pi loads extensions as TypeScript via [jiti](https://github.com/unjs/jiti), there is no build step — Pi runs the source directly.
 
-First install the extension's own dependencies so its runtime imports resolve:
+#### Run the extension from source
+
+1. **Install the extension's own dependencies** so its runtime imports resolve:
+
+   ```bash
+   cd libs/pi-plugin
+   npm install
+   ```
+
+   > [!IMPORTANT]
+   > This is required even after `yarn install` at the repo root. The monorepo has no Yarn workspaces, so `@daytona/sdk` resolves only through the TypeScript path map (compile time). At **runtime**, Pi/jiti needs `@daytona/sdk` (and the other deps) in `libs/pi-plugin/node_modules` — without this you'll get `Cannot find module '@daytona/sdk'`.
+
+2. **Make sure no other copy is installed.** If you previously ran `pi install …` for this extension, both copies load and collide (`Tool "bash" conflicts with …`). Check and remove it:
+
+   ```bash
+   pi list                                    # shows installed packages
+   pi uninstall npm:@daytona/pi               # if installed from npm
+   pi uninstall git:github.com/daytonaio/daytona   # if installed from git
+   ```
+
+   > [!IMPORTANT]
+   > Load the extension **either** with `-e` (from source, for development) **or** via `pi install` (as a user) — never both at once, or every tool and flag conflicts.
+
+3. **Run Pi against the source** with `--extension` (`-e`):
+
+   ```bash
+   DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-plugin/index.ts --daytona
+   ```
+
+#### Type-check, smoke, and live tests
 
 ```bash
+npx nx run pi-plugin:type-check   # type-check (from the repo root)
+
 cd libs/pi-plugin
-npm install
-```
-
-> [!IMPORTANT]
-> This step is required even though you've run `yarn install` at the repo root. The monorepo has no Yarn workspaces, so `@daytona/sdk` resolves only via the TypeScript path map (compile time). At **runtime**, Pi/jiti needs `@daytona/sdk` (and the other deps) in `libs/pi-plugin/node_modules` — without this install you'll get `Cannot find module '@daytona/sdk'`.
-
-Then point Pi at the source with `--extension` (`-e`) to load it for a single run:
-
-```bash
-DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-plugin/index.ts --daytona
-```
-
-Type-check the extension:
-
-```bash
-npx nx run pi-plugin:type-check
-```
-
-Run the offline smoke test (no API key or network needed):
-
-```bash
-cd libs/pi-plugin
-npm install
-npm run check
-```
-
-Run the end-to-end tests against real Daytona (needs `DAYTONA_API_KEY`):
-
-```bash
-cd libs/pi-plugin
-npm run test:live
+npm run check                     # offline: type-check + load smoke (no API key/network)
+npm run test:live                 # end-to-end against real Daytona (needs DAYTONA_API_KEY)
 ```
 
 ### Publishing
