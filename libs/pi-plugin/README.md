@@ -176,7 +176,17 @@ To modify the extension, edit the source files in `libs/pi-plugin`.
 > [!NOTE]
 > Because Pi loads extensions as TypeScript via [jiti](https://github.com/unjs/jiti), there is no build step — Pi runs the source directly.
 
-To test the extension, point Pi at the source with `--extension` (`-e`) to load it for a single run without installing:
+First install the extension's own dependencies so its runtime imports resolve:
+
+```bash
+cd libs/pi-plugin
+npm install
+```
+
+> [!IMPORTANT]
+> This step is required even though you've run `yarn install` at the repo root. The monorepo has no Yarn workspaces, so `@daytona/sdk` resolves only via the TypeScript path map (compile time). At **runtime**, Pi/jiti needs `@daytona/sdk` (and the other deps) in `libs/pi-plugin/node_modules` — without this install you'll get `Cannot find module '@daytona/sdk'`.
+
+Then point Pi at the source with `--extension` (`-e`) to load it for a single run:
 
 ```bash
 DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-plugin/index.ts --daytona
