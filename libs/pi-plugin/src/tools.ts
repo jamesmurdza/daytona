@@ -6,10 +6,13 @@
 /**
  * Tool registration.
  *
- * Each of Pi's built-in tools is registered with a sandbox-backed variant that
- * runs when a sandbox is active, falling back to the local tool otherwise. The
- * operation-backed tools (bash/read/write/edit/ls) share one wrapper; find/grep
- * run a dedicated in-sandbox search; preview_url is a custom tool.
+ * Each of Pi's built-in tools is replaced with a sandbox-backed variant:
+ * - a sandbox is active        -> the tool runs inside it
+ * - `--daytona` set, no sandbox -> the call FAILS (never run on your host)
+ * - `--daytona` off            -> the extension is dormant, Pi's local tool runs
+ *
+ * The operation-backed tools (bash/read/write/edit/ls) share one wrapper;
+ * find/grep run a dedicated in-sandbox search; preview_url is a custom tool.
  */
 
 import type { Sandbox } from "@daytona/sdk";
@@ -49,6 +52,20 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
 	const localFind = createFindTool(localCwd);
 	const localGrep = createGrepTool(localCwd);
 
+	/**
+	 * Resolve the sandbox for a tool call. With `--daytona` on but no sandbox, we
+	 * throw rather than run on the host. With `--daytona` off, return null so the
+	 * local tool runs (the extension is dormant — it never broke normal Pi usage).
+	 */
+	function requireSandbox(): ToolSandbox | null {
+		const active = getActive();
+		if (active) return active;
+		if (pi.getFlag("daytona") === true) {
+			throw new Error("Daytona sandbox is unavailable — the tool was NOT run on your host. Restart Pi.");
+		}
+		return null;
+	}
+
 	/** Wrap a tool so it runs against the sandbox (built per call) when one is active. */
 	function sandboxTool<T extends { execute: (...args: never[]) => unknown }>(
 		local: T,
@@ -57,7 +74,7 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
 		return {
 			...local,
 			execute: (...args: Parameters<T["execute"]>) => {
-				const active = getActive();
+				const active = requireSandbox();
 				const tool = active ? makeRemote(active.cwd, active.sandbox) : local;
 				return tool.execute(...args);
 			},
@@ -76,7 +93,7 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
 	pi.registerTool({
 		...localFind,
 		async execute(id, params, signal, onUpdate) {
-			const active = getActive();
+			const active = requireSandbox();
 			if (active) return runRemoteFind(active.sandbox, active.cwd, params as FindParams);
 			return localFind.execute(id, params, signal, onUpdate);
 		},
@@ -85,7 +102,7 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
 	pi.registerTool({
 		...localGrep,
 		async execute(id, params, signal, onUpdate) {
-			const active = getActive();
+			const active = requireSandbox();
 			if (active) return runRemoteGrep(active.sandbox, active.cwd, params as GrepParams);
 			return localGrep.execute(id, params, signal, onUpdate);
 		},
