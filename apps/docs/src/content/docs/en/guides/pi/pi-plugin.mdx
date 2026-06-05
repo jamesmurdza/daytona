@@ -1,9 +1,9 @@
 ---
 title: Run Pi with the Daytona Extension
-description: Use the Daytona Pi extension to run every Pi tool call inside a remote, ephemeral Daytona sandbox while the agent runs locally.
+description: Use the Daytona Pi extension to run every Pi tool call inside a remote Daytona sandbox while the agent runs locally.
 ---
 
-This guide demonstrates how to run the [Daytona Pi extension](https://www.npmjs.com/package/@daytona/pi) which integrates Daytona sandboxes and [Pi](https://pi.dev/). When the extension is active, the agent runs on your machine while every tool call — `bash`, file I/O, search — runs inside a secure, ephemeral Daytona sandbox.
+This guide demonstrates how to run the [Daytona Pi extension](https://www.npmjs.com/package/@daytona/pi) which integrates Daytona sandboxes and [Pi](https://pi.dev/). When the extension is active, the agent runs on your machine while every tool call — `bash`, file I/O, search — runs inside a secure Daytona sandbox that persists with your session.
 
 ### 1. Workflow Overview
 
@@ -81,7 +81,7 @@ When you launch with `--repo` pointing at a **github.com** repository and you're
 2. After each agent turn — and once more when you exit — it commits the agent's changes and pushes them to that branch. Unchanged trees are skipped.
 3. Forks start a fresh sandbox and branch off the parent session's branch.
 
-All git network operations (clone, commit, push) run **inside the sandbox** via the Daytona git API. The host only uses `gh` to mint a token and call the GitHub REST API. Because the work lives durably on GitHub, the sandbox stays fully ephemeral.
+All git network operations (clone, commit, push) run **inside the sandbox** via the Daytona git API. The host only uses `gh` to mint a token and call the GitHub REST API.
 
 Without `--repo` (or `gh` auth, or for a non-GitHub remote), push is disabled — the sandbox still keeps a local git repo and commits for consistency, but nothing is pushed.
 
@@ -106,6 +106,7 @@ Pi's tool layer is pluggable, so the extension substitutes Daytona-backed implem
 
 The sandbox lifecycle is fully managed:
 
-- **Idle pauses** the sandbox after 30 minutes; its filesystem is preserved and the next tool call transparently restarts it.
-- **Deleted on quit** when you exit Pi.
-- **Crash backstop**: the sandbox auto-deletes ~24 hours after stopping, with Daytona's 7-day auto-archive as a further safeguard.
+- **One sandbox per session, kept across runs.** The sandbox is recorded and reattached when you resume the session, so your work and environment persist.
+- **Idle pauses** the sandbox after 30 minutes; its filesystem is preserved and resuming transparently restarts it.
+- **Deleted when you delete the session** from Pi's resume menu — reaped on the next Pi launch/exit (Pi has no session-deleted event, so the extension reconciles live sessions against its sandboxes). A ~30-day auto-delete is a crash backstop.
+- **In-memory sessions** (`--blank` / no session) can't be resumed, so their sandbox is deleted on exit.

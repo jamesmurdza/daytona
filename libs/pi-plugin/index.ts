@@ -16,6 +16,7 @@
 import { Daytona, type Sandbox } from "@daytona/sdk";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
+	SessionManager,
 	createBashTool,
 	createEditTool,
 	createFindTool,
@@ -50,14 +51,21 @@ import {
 } from "./src/github.ts";
 import { commitAndPush } from "./src/sync.ts";
 
-/** Session custom-entry type recording the GitHub branch for this session. */
-const BRANCH_ENTRY = "daytona-pi-branch";
+/** Session custom-entry type recording the sandbox bound to this session. */
+const SESSION_ENTRY = "daytona-session";
 
-interface BranchEntryData {
-	branch: string;
+/** GitHub sync target for a session (set only when pushing is enabled). */
+interface GitTarget {
+	slug: RepoSlug;
 	base: string;
-	owner: string;
-	repo: string;
+	branch: string;
+}
+
+/** Persisted record so a session can reattach its sandbox on resume. */
+interface SessionEntryData {
+	sandboxId: string;
+	cwd: string;
+	git?: GitTarget;
 }
 
 /** State for the sandbox bound to the current session. */
@@ -66,7 +74,7 @@ interface ActiveSandbox {
 	/** Working directory inside the sandbox (repo root, or workspace when no --repo). */
 	cwd: string;
 	/** GitHub sync target — set only when --repo is a github.com repo and gh has a token. */
-	git?: { slug: RepoSlug; base: string; branch: string };
+	git?: GitTarget;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -87,6 +95,8 @@ export default function (pi: ExtensionAPI) {
 
 	// Resolved lazily on session_start (CLI flags are not available at load time).
 	let active: ActiveSandbox | null = null;
+	// Daytona client for the session; reused for reaping at shutdown.
+	let daytona: Daytona | null = null;
 
 	// --- Tool registration: delegate to the sandbox when one is active. ---
 
@@ -310,29 +320,56 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
+		const dt = new Daytona({ apiKey });
+		daytona = dt;
+		const persisted = ctx.sessionManager.getSessionFile() !== undefined;
+		const sessionId = ctx.sessionManager.getSessionId();
+
+		// Reap sandboxes whose session was deleted from the resume menu. Runs in
+		// the background so it never slows startup.
+		if (persisted) void reapOrphans(dt);
+
 		setStatus(ctx, "☁ daytona · spinning up sandbox…");
 		const startedAt = Date.now();
 
 		try {
-			const daytona = new Daytona({ apiKey });
+			// Reattach to this session's existing sandbox on resume/reload. A fork
+			// always gets a fresh sandbox (branched off the parent below).
+			if (persisted && event.reason !== "fork") {
+				const prev = latestSessionEntry(ctx);
+				if (prev) {
+					try {
+						setStatus(ctx, "☁ daytona · resuming sandbox…");
+						const sandbox = await dt.get(prev.sandboxId);
+						await ensureStarted(sandbox);
+						active = { sandbox, cwd: prev.cwd, git: prev.git };
+						ctx.ui.notify(`Reattached sandbox · ${shortId(sandbox.id)}${prev.git ? ` · ${prev.git.branch}` : ""}`, "info");
+						setRunningStatus(ctx, sandbox.id, prev.cwd);
+						return;
+					} catch {
+						// Sandbox is gone (reaped/deleted) — fall through and create a fresh one.
+					}
+				}
+			}
+
 			const snapshot = stringFlag(pi.getFlag("snapshot"));
 			const isPublic = pi.getFlag("public") === true;
 
-			const sandbox = await daytona.create({
+			const sandbox = await dt.create({
 				snapshot,
 				public: isPublic,
-				// Idle PAUSES the sandbox (its filesystem is preserved) rather than
-				// destroying it, so stepping away doesn't lose your work — the next
-				// tool call transparently restarts it (see withRecovery). We still
-				// delete on quit; autoDeleteInterval is a leak backstop for crashes.
+				// Idle PAUSES the sandbox (filesystem preserved); the next tool call
+				// transparently restarts it (see withRecovery). The sandbox persists
+				// across sessions and is only reaped once its session is deleted, so
+				// autoDelete is just a long crash backstop for persisted sessions.
 				autoStopInterval: 30, // minutes idle -> stop
-				autoDeleteInterval: 1440, // delete only after ~24h continuously stopped
-				labels: { "created-by": "pi-daytona" },
+				autoDeleteInterval: persisted ? 43200 : 1440, // 30d backstop vs 24h when ephemeral
+				labels: { "created-by": "pi-daytona", "session-id": sessionId },
 			});
 
 			const home = (await sandbox.getUserHomeDir()) ?? "/home/daytona";
 			let cwd = home;
-			let git: ActiveSandbox["git"];
+			let git: GitTarget | undefined;
 
 			const repo = stringFlag(pi.getFlag("repo"));
 			if (repo) {
@@ -345,12 +382,12 @@ export default function (pi: ExtensionAPI) {
 					// Each session gets its own GitHub branch pi/<short-session-id>. We create
 					// the ref on GitHub first (off the base), then clone that branch so
 					// the sandbox has an upstream to push back to (see sync.ts).
-					const branch = `pi/${shortId(ctx.sessionManager.getSessionId())}`;
+					const branch = `pi/${shortId(sessionId)}`;
 					let base = stringFlag(pi.getFlag("branch"));
 					// A fork branches off the parent session's branch.
 					if (event.reason === "fork") {
-						const parent = latestBranchEntry(ctx);
-						if (parent) base = parent.branch;
+						const parent = latestSessionEntry(ctx);
+						if (parent?.git) base = parent.git.branch;
 					}
 					if (!base) base = await getDefaultBranch(pi, slug);
 					if (!base) throw new Error("Could not resolve a base branch on GitHub.");
@@ -360,8 +397,6 @@ export default function (pi: ExtensionAPI) {
 					await ensureBranch(pi, slug, branch, sha);
 					await sandbox.git.clone(url, cwd, branch, undefined, "x-access-token", token);
 					git = { slug, base, branch };
-					const data: BranchEntryData = { branch, base, owner: slug.owner, repo: slug.repo };
-					pi.appendEntry(BRANCH_ENTRY, data);
 				} else {
 					// Not a github.com repo, or no gh token: clone read-only, no push.
 					await sandbox.git.clone(url, cwd, stringFlag(pi.getFlag("branch")));
@@ -386,6 +421,11 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			active = { sandbox, cwd, git };
+			// Record the sandbox so this session can reattach it after a restart.
+			if (persisted) {
+				const data: SessionEntryData = { sandboxId: sandbox.id, cwd, git };
+				pi.appendEntry(SESSION_ENTRY, data);
+			}
 
 			const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
 			const branchInfo = git ? ` · ${git.branch}` : "";
@@ -427,9 +467,10 @@ export default function (pi: ExtensionAPI) {
 		}
 	});
 
-	// Tear down the sandbox on exit (it's ephemeral to the session). The agent's
-	// work is durable on GitHub, so deletion is safe — but flush a final sync
-	// first to capture the last turn before the sandbox goes away.
+	// On exit, flush a final sync, then KEEP the sandbox (autoStop pauses it) so
+	// the session can be resumed later. The sandbox is only deleted once its
+	// session is deleted from the resume menu — handled by reapOrphans, which we
+	// also run here to catch sessions deleted during this run.
 	pi.on("session_shutdown", async (event, ctx) => {
 		if (!active) return;
 		if (event.reason !== "quit" && event.reason !== "reload") return;
@@ -442,24 +483,75 @@ export default function (pi: ExtensionAPI) {
 		} catch {
 			// best-effort final sync
 		}
-		try {
-			await current.sandbox.delete();
-		} catch {
-			// Best-effort: autoStop + autoDelete reap it later if this didn't run.
+
+		const persisted = ctx.sessionManager.getSessionFile() !== undefined;
+		if (persisted) {
+			// Reap sandboxes whose session no longer exists; this session's own
+			// sandbox stays (its session file still exists) and is paused by autoStop.
+			if (daytona) await reapOrphans(daytona);
+		} else {
+			// In-memory session: nothing to resume, so delete the sandbox now.
+			try {
+				await current.sandbox.delete();
+			} catch {
+				// Best-effort: autoStop + autoDelete reap it later if this didn't run.
+			}
 		}
 	});
 }
 
-/** Most recent GitHub branch recorded in this session (used to fork off a parent's branch). */
-function latestBranchEntry(ctx: ExtensionContext): BranchEntryData | undefined {
+/** Most recent Daytona sandbox record in this session (for reattach / fork base). */
+function latestSessionEntry(ctx: ExtensionContext): SessionEntryData | undefined {
 	const entries = ctx.sessionManager.getEntries();
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const e = entries[i] as { type?: string; customType?: string; data?: unknown };
-		if (e.type === "custom" && e.customType === BRANCH_ENTRY) {
-			return e.data as BranchEntryData;
+		if (e.type === "custom" && e.customType === SESSION_ENTRY) {
+			return e.data as SessionEntryData;
 		}
 	}
 	return undefined;
+}
+
+/** Ensure a sandbox is running, starting it if it was paused or archived. */
+async function ensureStarted(sandbox: Sandbox): Promise<void> {
+	try {
+		await sandbox.refreshData();
+	} catch {
+		// If we can't read state, let start() surface the real error.
+	}
+	if (sandbox.state !== "started") {
+		await sandbox.start();
+	}
+}
+
+/**
+ * Delete pi-daytona sandboxes whose session no longer exists. This is how a
+ * sandbox gets cleaned up when its session is deleted from the resume menu —
+ * Pi has no session-deleted hook, so we reconcile against SessionManager.listAll().
+ * Best-effort: never throws.
+ */
+async function reapOrphans(daytona: Daytona): Promise<void> {
+	try {
+		const live = new Set((await SessionManager.listAll()).map((s) => s.id));
+		const orphans: Sandbox[] = [];
+		for await (const sandbox of daytona.list({ labels: { "created-by": "pi-daytona" } })) {
+			let labels = sandbox.labels;
+			if (!labels || Object.keys(labels).length === 0) {
+				try {
+					await sandbox.refreshData();
+					labels = sandbox.labels;
+				} catch {
+					continue;
+				}
+			}
+			const sid = labels?.["session-id"];
+			// Only reap sandboxes we can attribute to a session that no longer exists.
+			if (sid && !live.has(sid)) orphans.push(sandbox);
+		}
+		await Promise.allSettled(orphans.map((s) => s.delete()));
+	} catch {
+		// best-effort reconciliation
+	}
 }
 
 // --- helpers ---
