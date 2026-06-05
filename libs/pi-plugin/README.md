@@ -181,7 +181,9 @@ Run Pi:
 DAYTONA_API_KEY=dtn_... pi --daytona
 ```
 
-Edits to the source take effect on the next run — no reinstall needed. Alternatively, load the source for a single run without installing:
+Edits to the source take effect on the next run — no reinstall needed.
+
+Alternatively, load the source for a single run without installing:
 
 ```bash
 DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-plugin/index.ts --daytona
