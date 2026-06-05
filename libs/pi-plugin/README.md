@@ -160,21 +160,26 @@ This is required even after `yarn install` at the repo root: the monorepo has no
 
 #### Run from source
 
-Load your local copy one of two ways. Use only **one** at a time — don't combine them with each other or with a published install, or every tool and flag conflicts. To check for / remove an existing copy:
+Remove any previously installed copy (loading two copies makes every tool and flag conflict):
 
 ```bash
 pi list                        # shows installed packages and their exact source
 pi uninstall <source>          # e.g. npm:@daytona/pi — use the source shown by `pi list`
 ```
 
-**Option A — install the local directory** (persists across runs; reads the source in place, so edits are live):
+Install the local directory:
 
 ```bash
 pi install ./libs/pi-plugin    # add --local to scope it to the current project instead of globally
+```
+
+Run Pi:
+
+```bash
 DAYTONA_API_KEY=dtn_... pi --daytona
 ```
 
-**Option B — load it for a single run** with `--extension` (`-e`):
+Edits to the source take effect on the next run — no reinstall needed. Alternatively, load the source for a single run without installing:
 
 ```bash
 DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-plugin/index.ts --daytona
