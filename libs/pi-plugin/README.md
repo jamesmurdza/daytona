@@ -96,7 +96,7 @@ While Pi is running with `--daytona`, you can manage the active sandbox:
 - `/sandbox status` — id, state, working directory, branch, snapshot, and visibility
 - `/sandbox url <port>` — get a preview URL for a port served inside the sandbox
 - `/sandbox view` — print the GitHub compare/PR URL for this session's branch
-- `/sandbox merge` — merge this session's branch into its base on GitHub, then delete it
+- `/sandbox merge` — merge this session's branch into its base on GitHub
 
 ## How It Works
 
@@ -108,7 +108,7 @@ If you're in a **github.com** repo and logged in via the GitHub CLI (`gh auth lo
 
 - On start, the extension creates `pi/<short-session-id>` on GitHub (off your current branch, or `--branch`) and clones it into the sandbox over HTTPS.
 - The agent **commits its own work** — it's prompted to commit after making changes, and not to push. After each turn (and once more on exit) the extension pushes those commits to the branch via the Daytona git API. A branch with nothing new is skipped.
-- `/sandbox view` gives you the compare/PR link; `/sandbox merge` merges the branch into its base and deletes it.
+- `/sandbox view` gives you the compare/PR link; `/sandbox merge` merges the branch into its base.
 - **Forks** start a fresh sandbox and branch off the parent session's branch.
 
 All network git operations (clone/push) run **inside the sandbox** through Daytona; the host only uses `gh` to mint a token and call the GitHub API. A temporary git identity is configured in the sandbox so commits work out of the box.
@@ -126,8 +126,8 @@ Daytona's `executeCommand` resolves only when the command's output reaches EOF, 
 ### Lifecycle
 
 - **One sandbox per session, kept across runs.** A session's sandbox is recorded and **reattached** when you resume the session — your work and environment persist.
-- **Idle pauses** the sandbox (`autoStopInterval: 30` min). Its filesystem is preserved; resuming transparently restarts it.
-- **Deleted when the session is.** When you delete a session from Pi's resume menu, its sandbox is reaped on the next Pi launch/exit (Pi has no session-deleted hook, so the extension reconciles live sessions against its sandboxes). `autoDeleteInterval` (~30 days) is a crash backstop.
+- **Idle pauses** the sandbox (`autoStopInterval: 5` min). Its filesystem is preserved; resuming transparently restarts it.
+- **Deleted when the session is.** When you delete a session from Pi's resume menu, its sandbox is reaped on the next Pi launch/exit (Pi has no session-deleted hook, so the extension reconciles live sessions against its sandboxes). A sandbox that stays stopped is also auto-deleted after ~48h (`autoDeleteInterval`).
 - **In-memory sessions** (`--blank` / no session) can't be resumed, so their sandbox is deleted on exit.
 
 > [!CAUTION]

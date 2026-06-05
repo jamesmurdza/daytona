@@ -92,7 +92,7 @@ Once Pi is running with `--daytona`, you can manage the active sandbox:
 - `/sandbox status` — show the sandbox id, state, working directory, branch, snapshot, and visibility
 - `/sandbox url <port>` — get a preview URL for a port served inside the sandbox
 - `/sandbox view` — print the GitHub compare/PR URL for this session's branch
-- `/sandbox merge` — merge this session's branch into its base on GitHub, then delete it
+- `/sandbox merge` — merge this session's branch into its base on GitHub
 
 The agent can also call the `preview_url(port)` tool itself — after it starts a dev server, it can hand you a clickable link without you running `/sandbox url`.
 
@@ -103,6 +103,6 @@ Pi's tool layer is pluggable, so the extension substitutes Daytona-backed implem
 The sandbox lifecycle is fully managed:
 
 - **One sandbox per session, kept across runs.** The sandbox is recorded and reattached when you resume the session, so your work and environment persist.
-- **Idle pauses** the sandbox after 30 minutes; its filesystem is preserved and resuming transparently restarts it.
-- **Deleted when you delete the session** from Pi's resume menu — reaped on the next Pi launch/exit (Pi has no session-deleted event, so the extension reconciles live sessions against its sandboxes). A ~30-day auto-delete is a crash backstop.
+- **Idle pauses** the sandbox after 5 minutes; its filesystem is preserved and resuming transparently restarts it.
+- **Deleted when you delete the session** from Pi's resume menu — reaped on the next Pi launch/exit (Pi has no session-deleted event, so the extension reconciles live sessions against its sandboxes). A sandbox that stays stopped is also auto-deleted after ~48h.
 - **In-memory sessions** (`--blank` / no session) can't be resumed, so their sandbox is deleted on exit.

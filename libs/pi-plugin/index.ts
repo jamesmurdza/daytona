@@ -41,7 +41,6 @@ import { joinPath, normalizeRepoUrl, repoName, shellQuote, shortId } from "./src
 import {
 	type RepoSlug,
 	compareUrl,
-	deleteBranch,
 	detectLocalRepo,
 	ensureBranch,
 	getBranchSha,
@@ -272,7 +271,7 @@ export default function (pi: ExtensionAPI) {
 				const { slug, base, branch } = active.git;
 				const ok = await ctx.ui.confirm(
 					"Merge branch",
-					`Merge ${branch} into ${base}? This does a direct GitHub merge (merge commit) and deletes the branch.`,
+					`Merge ${branch} into ${base}? This does a direct GitHub merge (merge commit).`,
 				);
 				if (!ok) return;
 				try {
@@ -284,7 +283,6 @@ export default function (pi: ExtensionAPI) {
 						ctx.ui.notify(`Merge failed: ${res.message}`, "error");
 						return;
 					}
-					await deleteBranch(pi, slug, branch);
 					ctx.ui.notify(`Merged ${branch} into ${base} ✓`, "info");
 				} catch (err) {
 					ctx.ui.notify(`Merge failed: ${errorMessage(err)}`, "error");
@@ -362,11 +360,10 @@ export default function (pi: ExtensionAPI) {
 				snapshot,
 				public: isPublic,
 				// Idle PAUSES the sandbox (filesystem preserved); the next tool call
-				// transparently restarts it (see withRecovery). The sandbox persists
-				// across sessions and is only reaped once its session is deleted, so
-				// autoDelete is just a long crash backstop for persisted sessions.
-				autoStopInterval: 30, // minutes idle -> stop
-				autoDeleteInterval: persisted ? 43200 : 1440, // 30d backstop vs 24h when ephemeral
+				// transparently restarts it (see withRecovery). It's reaped when its
+				// session is deleted; autoDelete is also a 48h idle TTL backstop.
+				autoStopInterval: 5, // minutes idle -> stop (pause)
+				autoDeleteInterval: 2880, // delete ~48h after it stops
 				labels: { "created-by": "pi-daytona", "session-id": sessionId },
 			});
 
