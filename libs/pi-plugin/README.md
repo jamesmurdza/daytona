@@ -160,28 +160,44 @@ To modify the extension, edit the source files in `libs/pi-plugin`.
 > [!NOTE]
 > Because Pi loads extensions as TypeScript via [jiti](https://github.com/unjs/jiti), there is no build step — Pi runs the source directly.
 
-#### Run the extension from source
+#### Install dependencies
 
-1. **Make sure no other copy is installed.** If you previously ran `pi install …` for this extension, both copies load and collide (`Tool "bash" conflicts with …`). Check and remove it:
+Install the extension's own dependencies once (needed for running it and for the tests):
 
-   ```bash
-   pi list                        # shows installed packages and their exact source
-   pi uninstall <source>          # e.g. npm:@daytona/pi — use the source shown by `pi list`
-   ```
+```bash
+cd libs/pi-plugin && npm install
+```
 
-2. **Run Pi against the source** with `--extension` (`-e`):
+This is required even after `yarn install` at the repo root: the monorepo has no Yarn workspaces, so `@daytona/sdk` resolves only via the TypeScript path map (compile time). At runtime, Pi needs it in `libs/pi-plugin/node_modules` — otherwise you'll see `Cannot find module '@daytona/sdk'`.
 
-   ```bash
-   DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-plugin/index.ts --daytona
-   ```
+#### Run from source
 
-#### Type-check, smoke, and live tests
+Load your local copy one of two ways. Use only **one** at a time — don't combine them with each other or with a published install, or every tool and flag conflicts. To check for / remove an existing copy:
+
+```bash
+pi list                        # shows installed packages and their exact source
+pi uninstall <source>          # e.g. npm:@daytona/pi — use the source shown by `pi list`
+```
+
+**Option A — install the local directory** (persists across runs; reads the source in place, so edits are live):
+
+```bash
+pi install ./libs/pi-plugin    # add --local to scope it to the current project instead of globally
+DAYTONA_API_KEY=dtn_... pi --daytona
+```
+
+**Option B — load it for a single run** with `--extension` (`-e`):
+
+```bash
+DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-plugin/index.ts --daytona
+```
+
+#### Tests
 
 ```bash
 npx nx run pi-plugin:type-check   # type-check (from the repo root; needs the monorepo installed)
 
 cd libs/pi-plugin
-npm install                       # the lib's own deps, for the commands below
 npm run smoke                     # offline: load the extension and check it registers (no API key/network)
 npm run test:live                 # end-to-end against real Daytona (needs DAYTONA_API_KEY)
 ```
