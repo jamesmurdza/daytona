@@ -104,8 +104,6 @@ The agent can also call the `preview_url(port)` tool itself — after it starts 
 
 Pi's tool layer is pluggable, so the extension substitutes Daytona-backed implementations of `bash`, `read`, `write`, `edit`, and `ls`, plus dedicated in-sandbox tools for `find` and `grep`. Tool calls run in the sandbox over the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk); if the sandbox becomes unavailable, calls fail with a clear message rather than silently running on your host.
 
-Project context (`AGENTS.md` / `CLAUDE.md`) is loaded from the **sandbox** repo instead of your host project, so the agent follows the instructions that ship with the code it's editing.
-
 The sandbox lifecycle is fully managed:
 
 - **One sandbox per session, kept across runs.** The sandbox is recorded and reattached when you resume the session, so your work and environment persist.
