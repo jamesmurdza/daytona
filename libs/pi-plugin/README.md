@@ -50,12 +50,14 @@ If no key is set and a UI is available, Pi prompts you for one once per session.
 
 ### Running Pi
 
-Run `pi --daytona` from inside a git repository — it clones the repo you're in into the sandbox and syncs your work to a GitHub branch (see [GitHub branch sync](#github-branch-sync)):
+Run Pi from inside a git repository:
 
 ```bash
 cd my-project
 pi --daytona
 ```
+
+The extension clones the repo you're in into the sandbox and syncs your work to a GitHub branch (see [GitHub branch sync](#github-branch-sync)).
 
 Or point at a different repository:
 
