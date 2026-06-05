@@ -175,8 +175,6 @@ To modify the extension, edit the source files in `libs/pi-plugin`.
    pi uninstall <source>          # e.g. npm:@daytona/pi — use the source shown by `pi list`
    ```
 
-   **Load the extension either with `-e` (from source, for development) or via `pi install` (as a user) — never both at once, or every tool and flag conflicts.**
-
 2. **Run Pi against the source** with `--extension` (`-e`):
 
    ```bash
