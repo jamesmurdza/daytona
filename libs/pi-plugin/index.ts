@@ -6,7 +6,7 @@
 /**
  * pi-daytona — run Pi's tools inside a remote, ephemeral Daytona sandbox.
  *
- * The agent's brain (LLM, TUI, sessions) stays local; only tool execution
+ * The agent runs locally; only tool execution
  * (bash + file I/O) is redirected into a Daytona container. Activation is
  * launch-scoped via the `--daytona` flag; the sandbox is torn down on exit.
  *

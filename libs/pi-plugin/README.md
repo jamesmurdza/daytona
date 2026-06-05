@@ -1,11 +1,11 @@
 # Daytona Sandbox Extension for Pi
 
-This is a Pi extension that runs every Pi tool call inside a Daytona sandbox. The agent's brain (LLM, TUI, sessions) stays on your machine, while `bash`, file I/O, and search execute in a remote, ephemeral sandbox that is created when you launch Pi with `--daytona` and torn down when you exit.
+This is a Pi extension that runs every Pi tool call inside a Daytona sandbox. The agent runs on your machine, while `bash`, file I/O, and search execute in a remote, ephemeral sandbox that is created when you launch Pi with `--daytona` and torn down when you exit.
 
 ## Features
 
 - Securely isolate Pi's tool execution in a sandbox environment
-- Keeps the agent's brain (LLM, TUI, sessions) on your machine while tools run remotely
+- Keeps the agent running on your machine while tools run remotely
 - Generates live preview links when a server starts in the sandbox
 - Optionally clones a git repository into the sandbox to start from an existing project
 
@@ -98,7 +98,7 @@ While Pi is running with `--daytona`, you can inspect the active sandbox:
 
 ## How It Works
 
-The agent's brain (LLM, TUI, sessions) stays on your machine. Pi's tool layer is pluggable, so this extension substitutes Daytona-backed implementations of `bash`, `read`, `write`, `edit`, and `ls`, plus dedicated in-sandbox tools for `find` and `grep`. A footer badge is the always-visible signal that work is remote.
+The agent runs on your machine. Pi's tool layer is pluggable, so this extension substitutes Daytona-backed implementations of `bash`, `read`, `write`, `edit`, and `ls`, plus dedicated in-sandbox tools for `find` and `grep`. A footer badge is the always-visible signal that work is remote.
 
 ### Backgrounding
 
