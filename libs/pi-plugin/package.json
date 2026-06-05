@@ -1,0 +1,52 @@
+{
+  "name": "@daytona/pi",
+  "version": "0.0.0-dev",
+  "description": "Pi coding agent extension that runs all tool calls inside a remote, ephemeral Daytona sandbox while the agent runs locally",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daytonaio/daytona.git"
+  },
+  "author": "Daytona Platforms Inc.",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/daytonaio/daytona/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "daytona",
+    "sandbox"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "files": [
+    "index.ts",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "check": "npm run typecheck && npm run smoke",
+    "test:connectivity": "node scripts/connectivity.mjs",
+    "test:integration": "node scripts/integration.mjs",
+    "test:variants": "node scripts/variants.mjs",
+    "test:bash-bg": "node scripts/bash-bg.mjs",
+    "test:recovery": "node scripts/recovery.mjs",
+    "test:e2e": "node node_modules/@earendil-works/pi-coding-agent/dist/cli.js -e ./index.ts -e ./scripts/e2e-fake-provider.ts -ne --provider fake --model test --api-key dummy-key --daytona --blank --no-session -p 'run pwd'",
+    "test:e2e-preview": "node node_modules/@earendil-works/pi-coding-agent/dist/cli.js -e ./index.ts -e ./scripts/e2e-preview-provider.ts -ne --provider fake --model test --api-key dummy-key --daytona --blank --no-session -p 'start a server and give me the url'",
+    "test:live": "npm run test:connectivity && npm run test:integration && npm run test:variants && npm run test:bash-bg && npm run test:recovery"
+  },
+  "dependencies": {
+    "@daytona/sdk": "^0.184.0"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.76.0",
+    "typebox": "1.1.38",
+    "typescript": "^5.6.0"
+  }
+}

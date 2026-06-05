@@ -1,0 +1,93 @@
+---
+title: Run Pi with the Daytona Extension
+description: Use the Daytona Pi extension to run every Pi tool call inside a remote, ephemeral Daytona sandbox while the agent runs locally.
+---
+
+This guide demonstrates how to run the [Daytona Pi extension](https://www.npmjs.com/package/@daytona/pi) which integrates Daytona sandboxes and [Pi](https://pi.dev/). When the extension is active, the agent's brain (LLM, TUI, sessions) stays on your machine while every tool call — `bash`, file I/O, search — runs inside a secure, ephemeral Daytona sandbox.
+
+### 1. Workflow Overview
+
+When you launch Pi with the `--daytona` flag, a sandbox is created for the session. Operations such as running code, installing dependencies, and starting servers occur in the sandbox rather than on your host. The sandbox pauses when idle (preserving its filesystem) and is deleted when you quit Pi.
+
+### 2. Install Pi
+
+Install Pi globally with npm:
+
+```bash
+npm install -g @earendil-works/pi-coding-agent
+```
+
+See the [Pi documentation](https://pi.dev/) for other install options.
+
+### 3. Install the Extension
+
+Add the Daytona extension to Pi:
+
+```bash
+pi install npm:@daytona/pi
+```
+
+To update the extension later, run `pi update` — `pi install` will not refresh an existing install.
+
+### 4. Configure Environment
+
+This extension requires a [Daytona account](https://www.daytona.io/) and [Daytona API key](https://app.daytona.io/dashboard/keys) to create sandboxes.
+
+Set your Daytona API key as an environment variable:
+
+```bash
+export DAYTONA_API_KEY="your-api-key"
+```
+
+If no key is set, Pi prompts you for one once per session.
+
+### 5. Launch Pi
+
+Start Pi with the `--daytona` flag:
+
+```bash
+pi --daytona
+```
+
+To check that the extension is working, ask the agent to run `pwd` in the chat. You should see a sandbox path like `/home/daytona`, and a cloud badge in the footer indicating that work is remote:
+
+```
+☁ daytona · 7f3a9b21 · running · /home/daytona
+```
+
+### 6. CLI Flags
+
+The extension adds several flags to control the sandbox:
+
+| Flag                | Description                                            |
+| ------------------- | ----------------------------------------------------- |
+| `--daytona`         | Run tools inside a Daytona sandbox                     |
+| `--repo <url>`      | Git repo to clone into the sandbox (server-side)      |
+| `--branch <name>`   | Branch to clone (used with `--repo`)                  |
+| `--snapshot <name>` | Choose a Daytona snapshot / base image                |
+| `--public`          | Create a public sandbox so preview URLs need no token |
+
+For example, to start working on an existing repository:
+
+```bash
+pi --daytona --repo github.com/acme/api --branch dev
+```
+
+### 7. Slash Commands
+
+Once Pi is running with `--daytona`, you can inspect the active sandbox:
+
+- `/sandbox status` — show the sandbox id, state, working directory, snapshot, and visibility
+- `/sandbox url <port>` — get a preview URL for a port served inside the sandbox
+
+The agent can also call the `preview_url(port)` tool itself — after it starts a dev server, it can hand you a clickable link without you running `/sandbox url`.
+
+### 8. How It Works
+
+Pi's tool layer is pluggable, so the extension substitutes Daytona-backed implementations of `bash`, `read`, `write`, `edit`, and `ls`, plus dedicated in-sandbox tools for `find` and `grep`. Tool calls run in the sandbox over the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk); if the sandbox becomes unavailable, calls fail with a clear message rather than silently running on your host.
+
+The sandbox lifecycle is fully managed:
+
+- **Idle pauses** the sandbox after 30 minutes; its filesystem is preserved and the next tool call transparently restarts it.
+- **Deleted on quit** when you exit Pi.
+- **Crash backstop**: the sandbox auto-deletes ~24 hours after stopping, with Daytona's 7-day auto-archive as a further safeguard.
