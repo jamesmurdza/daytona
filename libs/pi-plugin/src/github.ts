@@ -27,9 +27,9 @@ export function parseRepoSlug(url: string): RepoSlug | undefined {
 	return { owner: m[1], repo: m[2] };
 }
 
-/** Build a GitHub compare URL (pre-fills a PR from base...branch). */
+/** Build a GitHub compare URL (base...branch — shows the diff and a "Create pull request" button). */
 export function compareUrl(slug: RepoSlug, base: string, branch: string): string {
-	return `https://github.com/${slug.owner}/${slug.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}?expand=1`;
+	return `https://github.com/${slug.owner}/${slug.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}`;
 }
 
 interface GhResult {
