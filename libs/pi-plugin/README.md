@@ -200,8 +200,9 @@ This will publish to npm with public access and use the version number from `pac
 
 ```
 libs/pi-plugin/
-├── index.ts            # Extension entry point: flags, tool registration, lifecycle
+├── index.ts            # Extension entry point: flags, lifecycle, commands
 ├── src/                # Daytona-backed tool implementations
+│   ├── tools.ts        # Tool registration (sandbox-backed tools + preview_url)
 │   ├── auth.ts         # Daytona API key resolution
 │   ├── sandbox.ts      # Sandbox resilience layer (auto-restart, exec)
 │   ├── ops.ts          # Daytona-backed bash/read/write/edit/ls operations

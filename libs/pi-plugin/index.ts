@@ -15,27 +15,9 @@
 
 import { Daytona, type Sandbox } from "@daytona/sdk";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import {
-	SessionManager,
-	createBashTool,
-	createEditTool,
-	createFindTool,
-	createGrepTool,
-	createLsTool,
-	createReadTool,
-	createWriteTool,
-} from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { resolveApiKey } from "./src/auth.ts";
-import { type FindParams, runRemoteFind } from "./src/find-tool.ts";
-import { type GrepParams, runRemoteGrep } from "./src/grep-tool.ts";
-import {
-	createBashOps,
-	createEditOps,
-	createLsOps,
-	createReadOps,
-	createWriteOps,
-} from "./src/ops.ts";
+import { registerTools } from "./src/tools.ts";
 import { execCommand, withRecovery } from "./src/sandbox.ts";
 import { joinPath, normalizeRepoUrl, repoName, shellQuote, shortId } from "./src/util.ts";
 import {
@@ -84,133 +66,13 @@ export default function (pi: ExtensionAPI) {
 	pi.registerFlag("snapshot", { description: "Daytona snapshot/base image to use", type: "string" });
 	pi.registerFlag("public", { description: "Create a public sandbox (preview URLs need no token)", type: "boolean" });
 
-	const localCwd = process.cwd();
-	const localBash = createBashTool(localCwd);
-	const localRead = createReadTool(localCwd);
-	const localWrite = createWriteTool(localCwd);
-	const localEdit = createEditTool(localCwd);
-	const localLs = createLsTool(localCwd);
-	const localFind = createFindTool(localCwd);
-	const localGrep = createGrepTool(localCwd);
-
 	// Resolved lazily on session_start (CLI flags are not available at load time).
 	let active: ActiveSandbox | null = null;
 	// Daytona client for the session; reused for reaping at shutdown.
 	let daytona: Daytona | null = null;
 
-	// --- Tool registration: delegate to the sandbox when one is active. ---
-
-	pi.registerTool({
-		...localBash,
-		async execute(id, params, signal, onUpdate) {
-			if (active) {
-				const tool = createBashTool(active.cwd, { operations: createBashOps(active.sandbox) });
-				return tool.execute(id, params, signal, onUpdate);
-			}
-			return localBash.execute(id, params, signal, onUpdate);
-		},
-	});
-
-	pi.registerTool({
-		...localRead,
-		async execute(id, params, signal, onUpdate) {
-			if (active) {
-				const tool = createReadTool(active.cwd, { operations: createReadOps(active.sandbox) });
-				return tool.execute(id, params, signal, onUpdate);
-			}
-			return localRead.execute(id, params, signal, onUpdate);
-		},
-	});
-
-	pi.registerTool({
-		...localWrite,
-		async execute(id, params, signal, onUpdate) {
-			if (active) {
-				const tool = createWriteTool(active.cwd, { operations: createWriteOps(active.sandbox) });
-				return tool.execute(id, params, signal, onUpdate);
-			}
-			return localWrite.execute(id, params, signal, onUpdate);
-		},
-	});
-
-	pi.registerTool({
-		...localEdit,
-		async execute(id, params, signal, onUpdate) {
-			if (active) {
-				const tool = createEditTool(active.cwd, { operations: createEditOps(active.sandbox) });
-				return tool.execute(id, params, signal, onUpdate);
-			}
-			return localEdit.execute(id, params, signal, onUpdate);
-		},
-	});
-
-	pi.registerTool({
-		...localLs,
-		async execute(id, params, signal, onUpdate) {
-			if (active) {
-				const tool = createLsTool(active.cwd, { operations: createLsOps(active.sandbox) });
-				return tool.execute(id, params, signal, onUpdate);
-			}
-			return localLs.execute(id, params, signal, onUpdate);
-		},
-	});
-
-	// find and grep can't be redirected via operations: Pi runs fd/ripgrep
-	// locally, and Daytona's searchFiles only does basename matching. So we run
-	// the search inside the sandbox via dedicated tools.
-	pi.registerTool({
-		...localFind,
-		async execute(id, params, signal, onUpdate) {
-			if (active) {
-				return runRemoteFind(active.sandbox, active.cwd, params as FindParams);
-			}
-			return localFind.execute(id, params, signal, onUpdate);
-		},
-	});
-
-	pi.registerTool({
-		...localGrep,
-		async execute(id, params, signal, onUpdate) {
-			if (active) {
-				return runRemoteGrep(active.sandbox, active.cwd, params as GrepParams);
-			}
-			return localGrep.execute(id, params, signal, onUpdate);
-		},
-	});
-
-	// Custom tool: let the agent fetch a port's preview URL itself, so after it
-	// starts a server (e.g. `npm run dev &`) it can hand the user a clickable
-	// link without them running /sandbox url.
-	pi.registerTool({
-		name: "preview_url",
-		label: "Preview URL",
-		description:
-			"Get the public preview URL for a port served inside the Daytona sandbox. " +
-			"Use this after starting a server (e.g. a dev server on port 3000) to give the user a link.",
-		promptSnippet: "Get a browser-openable preview URL for a port served in the sandbox",
-		parameters: Type.Object({
-			port: Type.Number({ description: "The port the server listens on inside the sandbox" }),
-		}),
-		async execute(_id, { port }) {
-			if (!active) {
-				return { content: [{ type: "text", text: "No active Daytona sandbox." }], details: undefined };
-			}
-			const { sandbox } = active;
-			const link = await withRecovery(sandbox, () => sandbox.getPreviewLink(port));
-			const text = sandbox.public
-				? `Preview URL for port ${port}: ${link.url}`
-				: `Preview URL for port ${port}: ${link.url}\n` +
-					`This is a private sandbox, so the URL needs an auth header:\n` +
-					`  curl -H "x-daytona-preview-token: ${link.token}" ${link.url}`;
-			return { content: [{ type: "text", text }], details: undefined };
-		},
-	});
-
-	// Route user `!` bash commands to the sandbox too.
-	pi.on("user_bash", () => {
-		if (!active) return;
-		return { operations: createBashOps(active.sandbox) };
-	});
+	// Register all tools (each runs in the sandbox when one is active).
+	registerTools(pi, () => active);
 
 	// --- Informational commands (read-only; don't change the backend) ---
 
