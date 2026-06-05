@@ -76,6 +76,8 @@ interface ActiveSandbox {
 	cwd: string;
 	/** GitHub sync target — set only when --repo is a github.com repo and gh has a token. */
 	git?: GitTarget;
+	/** Context files (AGENTS.md/CLAUDE.md) read from the sandbox; loaded once, lazily. */
+	contextFiles?: Array<{ path: string; content: string }>;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -459,14 +461,34 @@ export default function (pi: ExtensionAPI) {
 	// Rewrite the agent's "current working directory" to the sandbox path.
 	// Match the whole line (not a literal host path) so this works regardless of
 	// what Pi used as the prompt cwd — avoids a silent no-op if they diverge.
-	pi.on("before_agent_start", (event) => {
+	// Adapt the system prompt for the sandbox: point the cwd line at the sandbox,
+	// swap the host-discovered project context (AGENTS.md/CLAUDE.md) for the ones in
+	// the sandbox repo, and add the commit-not-push guideline. (Pi doesn't export its
+	// prompt builder, so we edit the assembled prompt at its known markers.)
+	pi.on("before_agent_start", async (event) => {
 		if (!active) return;
-		const replacement = `Current working directory: ${active.cwd} (inside Daytona sandbox ${shortId(active.sandbox.id)})`;
-		let systemPrompt = event.systemPrompt.replace(/Current working directory: .*/g, replacement);
+		if (active.contextFiles === undefined) {
+			active.contextFiles = await loadSandboxContext(active.sandbox, active.cwd);
+		}
+
+		// 1) Working-directory line -> the sandbox path.
+		const cwdLine = `Current working directory: ${active.cwd} (Daytona sandbox ${shortId(active.sandbox.id)})`;
+		let systemPrompt = event.systemPrompt.replace(/Current working directory: .*/g, cwdLine);
+
+		// 2) Replace the host's <project_context> block with the sandbox repo's files.
+		const block = renderProjectContext(active.contextFiles);
+		const existing = /<project_context>[\s\S]*?<\/project_context>\n?/;
+		if (existing.test(systemPrompt)) {
+			systemPrompt = systemPrompt.replace(existing, block);
+		} else if (block) {
+			systemPrompt += `\n\n${block}`;
+		}
+
+		// 3) Commit-not-push guideline.
 		systemPrompt +=
-			"\n\nThis project is a git repository inside a Daytona sandbox. After you finish a unit of " +
-			"work, commit it with git (e.g. `git add -A && git commit -m \"...\"`). Do not push — " +
-			"pushing is handled automatically.";
+			"\n\nThis project is a git repository inside a Daytona sandbox. After you finish a unit of work, " +
+			'commit it with git (e.g. `git add -A && git commit -m "..."`). Do not push — pushing is handled automatically.';
+
 		return { systemPrompt };
 	});
 
@@ -535,6 +557,36 @@ function latestSessionEntry(ctx: ExtensionContext): SessionEntryData | undefined
 		}
 	}
 	return undefined;
+}
+
+/** Render context files into Pi's `<project_context>` prompt block format. */
+function renderProjectContext(files: Array<{ path: string; content: string }>): string {
+	if (files.length === 0) return "";
+	let s = "<project_context>\n\nProject-specific instructions and guidelines:\n\n";
+	for (const { path, content } of files) {
+		s += `<project_instructions path="${path}">\n${content}\n</project_instructions>\n\n`;
+	}
+	s += "</project_context>\n";
+	return s;
+}
+
+/**
+ * Read the repo's context files (AGENTS.md / CLAUDE.md) from the sandbox so the
+ * agent gets the sandbox repo's instructions instead of the host project's.
+ * Best-effort: missing files are skipped.
+ */
+async function loadSandboxContext(sandbox: Sandbox, cwd: string): Promise<Array<{ path: string; content: string }>> {
+	const files: Array<{ path: string; content: string }> = [];
+	for (const name of ["AGENTS.md", "CLAUDE.md"]) {
+		const path = joinPath(cwd, name);
+		try {
+			const buf = await sandbox.fs.downloadFile(path);
+			files.push({ path, content: Buffer.from(buf).toString("utf8") });
+		} catch {
+			// not present — skip
+		}
+	}
+	return files;
 }
 
 /** Ensure a sandbox is running, starting it if it was paused or archived. */

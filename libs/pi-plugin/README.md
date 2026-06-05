@@ -102,6 +102,8 @@ While Pi is running with `--daytona`, you can manage the active sandbox:
 
 The agent runs on your machine. Pi's tool layer is pluggable, so this extension substitutes Daytona-backed implementations of `bash`, `read`, `write`, `edit`, and `ls`, plus dedicated in-sandbox tools for `find` and `grep`. A footer badge is the always-visible signal that work is remote.
 
+Project context (`AGENTS.md` / `CLAUDE.md`) is read from the **sandbox** repo rather than your host project, so the agent follows the instructions that ship with the code it's actually editing.
+
 ### GitHub branch sync
 
 If you're in a **github.com** repo and logged in via the GitHub CLI (`gh auth login`), each session gets its own branch and the agent's commits are pushed there automatically. The repo comes from `--repo`, or — when you omit it — is **detected from the git project you launched Pi in** (its `origin` and current branch).
