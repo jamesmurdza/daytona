@@ -40,9 +40,6 @@ Set your Daytona API key as an environment variable (e.g. in your shell profile)
 export DAYTONA_API_KEY="your-api-key"
 ```
 
-> [!NOTE]
-> Don't put the key in a `.env` file in your project — this extension clones your repo into the sandbox and the agent auto-commits/pushes, so a committed secret could leak. Use a shell/environment variable instead.
-
 The extension also reads these optional variables:
 
 - `DAYTONA_API_URL` — defaults to `https://app.daytona.io/api`.
