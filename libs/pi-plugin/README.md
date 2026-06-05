@@ -158,7 +158,7 @@ Install the extension's own dependencies once (needed for running it and for the
 cd libs/pi-plugin && npm install
 ```
 
-This is required even after `yarn install` at the repo root: the monorepo has no Yarn workspaces, so `@daytona/sdk` resolves only via the TypeScript path map (compile time). At runtime, Pi needs it in `libs/pi-plugin/node_modules` — otherwise you'll see `Cannot find module '@daytona/sdk'`.
+This is needed even after `yarn install` at the repo root, which doesn't make `@daytona/sdk` resolvable at runtime.
 
 #### Run from source
 
