@@ -107,9 +107,6 @@ The agent runs on your machine. Pi's tool layer is pluggable, so this extension 
 - **Deleted when the session is.** When you delete a session from Pi's resume menu, its sandbox is reaped on the next Pi launch/exit (Pi has no session-deleted hook, so the extension reconciles live sessions against its sandboxes). There is no auto-delete timer — a sandbox lives until its session is gone.
 - **In-memory sessions** (`--blank` / no session) can't be resumed, so their sandbox is deleted on exit.
 
-> [!CAUTION]
-> If the sandbox is ever genuinely gone, tool calls fail with a clear message telling you to restart — they are **never** silently run on your host.
-
 ### GitHub branch sync
 
 If you're in a **github.com** repo and logged in via the GitHub CLI (`gh auth login`), each session gets its own branch and the agent's commits are pushed there automatically. The repo comes from `--repo`, or — when you omit it — is **detected from the git project you launched Pi in** (its `origin` and current branch).
