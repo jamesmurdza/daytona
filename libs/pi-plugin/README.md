@@ -177,9 +177,8 @@ To modify the extension, edit the source files in `libs/pi-plugin`.
 1. **Make sure no other copy is installed.** If you previously ran `pi install …` for this extension, both copies load and collide (`Tool "bash" conflicts with …`). Check and remove it:
 
    ```bash
-   pi list                                    # shows installed packages
-   pi uninstall npm:@daytona/pi               # if installed from npm
-   pi uninstall git:github.com/daytonaio/daytona   # if installed from git
+   pi list                        # shows installed packages and their exact source
+   pi uninstall <source>          # e.g. npm:@daytona/pi — use the source shown by `pi list`
    ```
 
    > [!IMPORTANT]
