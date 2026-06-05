@@ -360,10 +360,10 @@ export default function (pi: ExtensionAPI) {
 				snapshot,
 				public: isPublic,
 				// Idle PAUSES the sandbox (filesystem preserved); the next tool call
-				// transparently restarts it (see withRecovery). It's reaped when its
-				// session is deleted; autoDelete is also a 48h idle TTL backstop.
+				// transparently restarts it (see withRecovery). Auto-delete is disabled —
+				// the sandbox is reaped only when its session is deleted (see reapOrphans).
 				autoStopInterval: 5, // minutes idle -> stop (pause)
-				autoDeleteInterval: 2880, // delete ~48h after it stops
+				autoDeleteInterval: -1, // never auto-delete
 				labels: { "created-by": "pi-daytona", "session-id": sessionId },
 			});
 
