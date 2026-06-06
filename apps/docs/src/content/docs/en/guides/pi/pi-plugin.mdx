@@ -7,9 +7,7 @@ This guide demonstrates how to run the [Daytona Pi extension](https://www.npmjs.
 
 ### 1. Workflow Overview
 
-When you launch Pi with the `--daytona` flag, a sandbox is created for the session and the repository you launched Pi in is cloned into it. Operations such as running code, installing dependencies, and starting servers happen in the sandbox rather than on your host.
-
-Each session keeps its own sandbox: it pauses when idle (preserving its filesystem), is reattached when you resume the session, and is deleted only when you delete that session. If you're in a GitHub repository, the agent's commits are pushed to a dedicated `pi/<id>` branch as you work, so you can review and merge them like any other branch.
+When you launch Pi with `--daytona`, a sandbox is created for the session and the repo you launched Pi in is cloned into it. From then on, every tool call — running code, installing dependencies, starting servers — happens in the sandbox rather than on your host.
 
 ### 2. Setup
 
@@ -88,42 +86,29 @@ A session flows through it like this:
 4. **Idle / resume** — the sandbox pauses when idle and is reattached when you resume the session.
 5. **Session deleted** — the sandbox is reaped on the next launch or exit.
 
-The rest of this section shows the pieces that implement that flow.
-
 #### Tool registration
 
 Source: [`src/tools.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/src/tools.ts)
 
-Each built-in tool is wrapped so that, when a sandbox is active, it runs against it through the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk). The operation-backed tools share one helper:
+Each built-in tool is re-registered so that, when a sandbox is active, it runs against it through the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk). For example, `bash`:
 
 ```typescript
-function sandboxTool(local, makeRemote) {
-  return {
-    ...local,
-    execute: (...args) => {
-      const active = requireSandbox();
-      const tool = active ? makeRemote(active.cwd, active.sandbox) : local;
-      return tool.execute(...args);
-    },
-  };
-}
-
-pi.registerTool(sandboxTool(localBash, (cwd, sb) => createBashTool(cwd, { operations: createBashOps(sb) })));
-// ... read, write, edit, ls — and dedicated in-sandbox find / grep
+pi.registerTool({
+  ...localBash,
+  execute: (id, params, signal, onUpdate) => {
+    const active = getActive();
+    if (active) {
+      const bash = createBashTool(active.cwd, { operations: createBashOps(active.sandbox) });
+      return bash.execute(id, params, signal, onUpdate);
+    }
+    // --daytona set but no sandbox: fail rather than run on the host
+    if (pi.getFlag("daytona") === true) throw new Error("Daytona sandbox is unavailable.");
+    return localBash.execute(id, params, signal, onUpdate); // --daytona off: run locally
+  },
+});
 ```
 
-`requireSandbox()` makes sure tools never silently run on your host: with `--daytona` set but no sandbox available, the call fails instead of falling back to local execution.
-
-```typescript
-function requireSandbox() {
-  const active = getActive();
-  if (active) return active;
-  if (pi.getFlag("daytona") === true) {
-    throw new Error("Daytona sandbox is unavailable — the tool was NOT run on your host.");
-  }
-  return null; // --daytona off: the extension is dormant, run locally
-}
-```
+`read`, `write`, `edit`, and `ls` follow the same pattern; `find` and `grep` run a dedicated search inside the sandbox.
 
 #### System prompt
 
