@@ -73,16 +73,28 @@ While Pi is running with `--daytona`, you can manage the active sandbox:
 
 ### 3. Understanding the Extension Architecture
 
-The extension is a single Pi extension module that wires sandbox-backed behavior into Pi's pluggable tool layer and lifecycle hooks. The pieces are:
+The extension is a single Pi extension (`index.ts`, with helpers under `src/`) that splits work between your machine and the sandbox:
 
-- **Tool registration:** overrides `bash`, `read`, `write`, `edit`, and `ls` (plus in-sandbox `find`/`grep`) so they run in the sandbox.
-- **System prompt:** points the agent's working directory at the sandbox and asks it to commit its work.
-- **Lifecycle & reconciliation:** creates or reattaches one sandbox per session, and reaps a sandbox once its session is deleted.
-- **GitHub branch sync:** gives each session a branch, lets the agent commit, and pushes those commits via the Daytona git API.
+| On your machine (host)                      | In the sandbox (Linux)                              |
+| ------------------------------------------- | --------------------------------------------------- |
+| The agent — LLM, TUI, sessions              | Every tool call: `bash`, file I/O, `find` / `grep`  |
+| `gh`: mint a token, create/merge the branch | git clone / commit / push (via the Daytona git API) |
+
+A session flows through it like this:
+
+1. **`session_start`** — create or reattach this session's sandbox and clone its `pi/<id>` branch into it.
+2. **Each tool call** — runs inside the sandbox, never on your host.
+3. **`agent_end`** — push the agent's new commits to the branch.
+4. **Idle / resume** — the sandbox pauses when idle and is reattached when you resume the session.
+5. **Session deleted** — the sandbox is reaped on the next launch or exit.
+
+The rest of this section shows the pieces that implement that flow.
 
 #### Tool registration
 
-Each built-in tool is wrapped so that, when a sandbox is active, the tool runs against it through the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk). The operation-backed tools share one helper:
+Source: [`src/tools.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/src/tools.ts)
+
+Each built-in tool is wrapped so that, when a sandbox is active, it runs against it through the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk). The operation-backed tools share one helper:
 
 ```typescript
 function sandboxTool(local, makeRemote) {
@@ -100,7 +112,7 @@ pi.registerTool(sandboxTool(localBash, (cwd, sb) => createBashTool(cwd, { operat
 // ... read, write, edit, ls — and dedicated in-sandbox find / grep
 ```
 
-`requireSandbox()` enforces that tools never silently run on your host: when `--daytona` is set but the sandbox is unavailable, the call fails instead of falling back to local execution.
+`requireSandbox()` makes sure tools never silently run on your host: with `--daytona` set but no sandbox available, the call fails instead of falling back to local execution.
 
 ```typescript
 function requireSandbox() {
@@ -113,22 +125,9 @@ function requireSandbox() {
 }
 ```
 
-The operations themselves run commands in the sandbox. For example, the bash operation:
-
-```typescript
-export function createBashOps(sandbox: Sandbox): BashOperations {
-  return {
-    exec: async (command, cwd, { onData, timeout }) => {
-      const res = await execCommand(sandbox, backgroundSafe(command), cwd, timeout);
-      const output = res.result ?? res.artifacts?.stdout ?? "";
-      if (output) onData(Buffer.from(output));
-      return { exitCode: res.exitCode ?? null };
-    },
-  };
-}
-```
-
 #### System prompt
+
+Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
 
 A `before_agent_start` hook rewrites the agent's working-directory line to the sandbox path and tells it to commit (but not push) its work:
 
@@ -146,6 +145,8 @@ pi.on("before_agent_start", (event) => {
 
 #### Lifecycle and reconciliation
 
+Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
+
 On `session_start` the extension reattaches this session's existing sandbox if there is one, or creates a fresh one (and clones the GitHub branch into it). Because Pi has no "session deleted" event, the extension reconciles instead: it reaps any sandbox whose session no longer exists by comparing Daytona's labelled sandboxes against Pi's live sessions.
 
 ```typescript
@@ -161,6 +162,8 @@ async function reapOrphans(daytona) {
 This runs in the background on `session_start` and again on `session_shutdown`, so deleting a session from Pi's resume menu cleans up its sandbox on the next launch or exit.
 
 #### GitHub branch sync
+
+Source: [`src/sync.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/src/sync.ts), [`src/github.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/src/github.ts)
 
 When you're in a github.com repo and authenticated with `gh`, each session gets its own branch. The host only uses `gh` to mint a token and call the GitHub REST API (to create the branch and merge it); all git transfer — clone, commit, push — runs **inside the sandbox** via the Daytona git API.
 
