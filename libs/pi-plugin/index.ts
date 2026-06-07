@@ -18,11 +18,12 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { resolveApiKey } from "./src/auth.ts";
 import { registerTools } from "./src/tools.ts";
-import { execCommand, withRecovery } from "./src/sandbox.ts";
+import { execCommand } from "./src/sandbox.ts";
 import { joinPath, normalizeRepoUrl, repoName, shellQuote, shortId } from "./src/util.ts";
 import {
 	type RepoSlug,
 	compareUrl,
+	createPullRequest,
 	detectLocalRepo,
 	ensureBranch,
 	getBranchSha,
@@ -77,9 +78,9 @@ export default function (pi: ExtensionAPI) {
 	// --- Informational commands (read-only; don't change the backend) ---
 
 	pi.registerCommand("sandbox", {
-		description: "Manage the active Daytona sandbox: status | url <port> | view | merge",
+		description: "Inspect the active Daytona sandbox: status | view",
 		getArgumentCompletions: (prefix) => {
-			const subs = ["status", "url", "view", "merge"];
+			const subs = ["status", "view"];
 			const matches = subs.filter((s) => s.startsWith(prefix.trim()));
 			return matches.length > 0 ? matches.map((s) => ({ value: s, label: s })) : null;
 		},
@@ -88,32 +89,8 @@ export default function (pi: ExtensionAPI) {
 				ctx.ui.notify("No Daytona sandbox is active. Launch Pi with --daytona.", "warning");
 				return;
 			}
-			const [sub, ...rest] = args.trim().split(/\s+/).filter(Boolean);
+			const [sub] = args.trim().split(/\s+/).filter(Boolean);
 			const { sandbox, cwd } = active;
-
-			if (sub === "url") {
-				const port = Number(rest[0]);
-				if (!Number.isInteger(port) || port <= 0) {
-					ctx.ui.notify("Usage: /sandbox url <port>", "warning");
-					return;
-				}
-				try {
-					const link = await withRecovery(sandbox, () => sandbox.getPreviewLink(port));
-					if (sandbox.public) {
-						ctx.ui.notify(`Preview (port ${port}): ${link.url}`, "info");
-					} else {
-						ctx.ui.notify(
-							`Preview (port ${port}): ${link.url}\n` +
-								`Private sandbox — include header:\n` +
-								`  curl -H "x-daytona-preview-token: ${link.token}" ${link.url}`,
-							"info",
-						);
-					}
-				} catch (err) {
-					ctx.ui.notify(`Failed to get preview URL: ${errorMessage(err)}`, "error");
-				}
-				return;
-			}
 
 			if (sub === "view") {
 				if (!active.git) {
@@ -122,33 +99,6 @@ export default function (pi: ExtensionAPI) {
 				}
 				const { slug, base, branch } = active.git;
 				ctx.ui.notify(`${branch}: ${compareUrl(slug, base, branch)}`, "info");
-				return;
-			}
-
-			if (sub === "merge") {
-				if (!active.git) {
-					ctx.ui.notify("Merge needs a GitHub repo. Launch Pi with --repo.", "warning");
-					return;
-				}
-				const { slug, base, branch } = active.git;
-				const ok = await ctx.ui.confirm(
-					"Merge branch",
-					`Merge ${branch} into ${base}? This does a direct GitHub merge (merge commit).`,
-				);
-				if (!ok) return;
-				try {
-					// Push the agent's latest commits first so the merge includes them.
-					const token = await getGithubToken(pi);
-					await pushChanges({ sandbox, cwd, pushEnabled: true }, token);
-					const res = await mergeBranch(pi, slug, base, branch);
-					if (!res.ok) {
-						ctx.ui.notify(`Merge failed: ${res.message}`, "error");
-						return;
-					}
-					ctx.ui.notify(`Merged ${branch} into ${base} ✓`, "info");
-				} catch (err) {
-					ctx.ui.notify(`Merge failed: ${errorMessage(err)}`, "error");
-				}
 				return;
 			}
 
@@ -166,6 +116,61 @@ export default function (pi: ExtensionAPI) {
 				`☁ ${shortId(sandbox.id)} · ${state} · ${cwd}${branch}${snapshot} · ${visibility}`,
 				"info",
 			);
+		},
+	});
+
+	// Merge this session's branch into its base on GitHub (direct API merge).
+	pi.registerCommand("merge", {
+		description: "Merge this session's branch into its base on GitHub",
+		handler: async (_args, ctx) => {
+			if (!active?.git) {
+				ctx.ui.notify("Merge needs a GitHub repo. Launch Pi with --repo.", "warning");
+				return;
+			}
+			const { slug, base, branch } = active.git;
+			const ok = await ctx.ui.confirm(
+				"Merge branch",
+				`Merge ${branch} into ${base}? This does a direct GitHub merge (merge commit).`,
+			);
+			if (!ok) return;
+			try {
+				// Push the agent's latest commits first so the merge includes them.
+				const token = await getGithubToken(pi);
+				await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: true }, token);
+				const res = await mergeBranch(pi, slug, base, branch);
+				if (!res.ok) {
+					ctx.ui.notify(`Merge failed: ${res.message}`, "error");
+					return;
+				}
+				ctx.ui.notify(`Merged ${branch} into ${base} ✓`, "info");
+			} catch (err) {
+				ctx.ui.notify(`Merge failed: ${errorMessage(err)}`, "error");
+			}
+		},
+	});
+
+	// Open a pull request for this session's branch.
+	pi.registerCommand("pr", {
+		description: "Open a GitHub pull request for this session's branch",
+		handler: async (_args, ctx) => {
+			if (!active?.git) {
+				ctx.ui.notify("Opening a PR needs a GitHub repo. Launch Pi with --repo.", "warning");
+				return;
+			}
+			const { slug, base, branch } = active.git;
+			try {
+				// Push the agent's latest commits first so the PR includes them.
+				const token = await getGithubToken(pi);
+				await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: true }, token);
+				const res = await createPullRequest(pi, slug, base, branch);
+				if (!res.ok) {
+					ctx.ui.notify(`Failed to open PR: ${res.message}`, "error");
+					return;
+				}
+				ctx.ui.notify(`Pull request ${res.message}${res.url ? `: ${res.url}` : ""}`, "info");
+			} catch (err) {
+				ctx.ui.notify(`Failed to open PR: ${errorMessage(err)}`, "error");
+			}
 		},
 	});
 
