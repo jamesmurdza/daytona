@@ -111,23 +111,11 @@ pi.registerTool({
 
 `read`, `write`, `edit`, and `ls` follow the same pattern; `find` and `grep` run a dedicated search inside the sandbox.
 
-#### Lifecycle and reconciliation
+#### Session start
 
 Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
 
-On `session_start` the extension reattaches this session's existing sandbox if there is one, or creates a fresh one (and clones the GitHub branch into it). Because Pi has no "session deleted" event, the extension reconciles instead: it reaps any sandbox whose session no longer exists by comparing Daytona's labelled sandboxes against Pi's live sessions.
-
-```typescript
-async function reapOrphans(daytona) {
-  const live = new Set((await SessionManager.listAll()).map((s) => s.id));
-  for await (const sandbox of daytona.list({ labels: { "created-by": "pi-daytona" } })) {
-    const sessionId = sandbox.labels?.["session-id"];
-    if (sessionId && !live.has(sessionId)) await sandbox.delete();
-  }
-}
-```
-
-This runs in the background on `session_start` and again on `session_shutdown`, so deleting a session from Pi's resume menu cleans up its sandbox on the next launch or exit.
+On `session_start` the extension creates a sandbox for the session — or reattaches the one it created earlier, so resuming a session restores your work. With a GitHub repo, it also creates the `pi/<id>` branch and clones it into the sandbox.
 
 #### System prompt
 
@@ -167,6 +155,28 @@ pi.on("agent_end", async () => {
 ```
 
 When you're not in a github.com repo (or `gh` isn't authenticated), push is disabled — the sandbox still keeps a local git repo so the agent can commit, but nothing is pushed.
+
+#### Idle and resume
+
+The sandbox pauses after a short idle period (its filesystem is preserved) and is transparently restarted on the next tool call or when you resume the session.
+
+#### Reconciliation
+
+Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
+
+Pi has no "session deleted" event, so the extension reconciles: on `session_start` and `session_shutdown` it reaps any sandbox whose session no longer exists by comparing Daytona's labelled sandboxes against Pi's live sessions.
+
+```typescript
+async function reapOrphans(daytona) {
+  const live = new Set((await SessionManager.listAll()).map((s) => s.id));
+  for await (const sandbox of daytona.list({ labels: { "created-by": "pi-daytona" } })) {
+    const sessionId = sandbox.labels?.["session-id"];
+    if (sessionId && !live.has(sessionId)) await sandbox.delete();
+  }
+}
+```
+
+So deleting a session from Pi's resume menu cleans up its sandbox on the next launch or exit.
 
 **Key advantages:**
 
