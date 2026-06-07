@@ -89,8 +89,6 @@ A session flows through it like this:
 
 #### Tool registration
 
-Source: [`src/tools.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/src/tools.ts)
-
 Each built-in tool is re-registered so that, when a sandbox is active, it runs against it through the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk). For example, `bash`:
 
 ```typescript
@@ -113,13 +111,9 @@ pi.registerTool({
 
 #### Session start
 
-Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
-
 On `session_start` the extension creates a sandbox for the session — or reattaches the one it created earlier, so resuming a session restores your work. With a GitHub repo, it also creates the `pi/<id>` branch and clones it into the sandbox.
 
 #### System prompt
-
-Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
 
 A `before_agent_start` hook rewrites the agent's working-directory line to the sandbox path and tells it to commit (but not push) its work:
 
@@ -136,8 +130,6 @@ pi.on("before_agent_start", (event) => {
 ```
 
 #### GitHub branch sync
-
-Source: [`src/sync.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/src/sync.ts), [`src/github.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/src/github.ts)
 
 When you're in a github.com repo and authenticated with `gh`, each session gets its own branch. The host only uses `gh` to mint a token and call the GitHub REST API (to create the branch and merge it); all git transfer — clone, commit, push — runs **inside the sandbox** via the Daytona git API.
 
@@ -161,8 +153,6 @@ When you're not in a github.com repo (or `gh` isn't authenticated), push is disa
 The sandbox pauses after a short idle period (its filesystem is preserved) and is transparently restarted on the next tool call or when you resume the session.
 
 #### Reconciliation
-
-Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
 
 Pi has no "session deleted" event, so the extension reconciles: on `session_start` and `session_shutdown` it reaps any sandbox whose session no longer exists by comparing Daytona's labelled sandboxes against Pi's live sessions.
 
