@@ -79,15 +79,14 @@ The extension is a single Pi extension (`index.ts`, with helpers under `src/`) t
 
 A session flows through it like this:
 
-1. **Tool registration** — at startup the extension swaps Pi's built-in tools for sandbox-backed ones.
-2. **`session_start`** — create or reattach this session's sandbox and clone its `pi/<id>` branch into it.
-3. **`before_agent_start`** — rewrite the system prompt so the agent targets the sandbox.
-4. **Each tool call** — runs inside the sandbox, never on your host.
-5. **`agent_end`** — push the agent's new commits to the branch.
-6. **Idle / resume** — the sandbox pauses when idle and is reattached when you resume the session.
-7. **Session deleted** — the sandbox is reaped on the next launch or exit.
+1. Pi's built-in tools are replaced with sandbox-backed versions, so every tool call runs in the sandbox.
+2. A sandbox is created for the session — or reattached when you resume it — and the repo is cloned in.
+3. The agent's system prompt is pointed at the sandbox.
+4. The agent's commits are pushed to its branch after each turn.
+5. The sandbox pauses when idle and restarts when you come back.
+6. Sandboxes whose session no longer exists are deleted.
 
-#### Tool registration
+#### 1. Tool registration
 
 Each built-in tool is re-registered so that, when a sandbox is active, it runs against it through the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk). For example, `bash`:
 
@@ -109,11 +108,11 @@ pi.registerTool({
 
 `read`, `write`, `edit`, and `ls` follow the same pattern; `find` and `grep` run a dedicated search inside the sandbox.
 
-#### Session start
+#### 2. Session start
 
 On `session_start` the extension creates a sandbox for the session — or reattaches the one it created earlier, so resuming a session restores your work. With a GitHub repo, it also creates the `pi/<id>` branch and clones it into the sandbox.
 
-#### System prompt
+#### 3. System prompt
 
 A `before_agent_start` hook rewrites the agent's working-directory line to the sandbox path and tells it to commit (but not push) its work:
 
@@ -129,7 +128,7 @@ pi.on("before_agent_start", (event) => {
 });
 ```
 
-#### GitHub branch sync
+#### 4. GitHub branch sync
 
 When you're in a github.com repo and authenticated with `gh`, each session gets its own branch. The host only uses `gh` to mint a token and call the GitHub REST API (to create the branch and merge it); all git transfer — clone, commit, push — runs **inside the sandbox** via the Daytona git API.
 
@@ -148,11 +147,11 @@ pi.on("agent_end", async () => {
 
 When you're not in a github.com repo (or `gh` isn't authenticated), push is disabled — the sandbox still keeps a local git repo so the agent can commit, but nothing is pushed.
 
-#### Idle and resume
+#### 5. Idle and resume
 
 The sandbox pauses after a short idle period (its filesystem is preserved) and is transparently restarted on the next tool call or when you resume the session.
 
-#### Reconciliation
+#### 6. Reconciliation
 
 Pi has no "session deleted" event, so the extension reconciles: on `session_start` and `session_shutdown` it reaps any sandbox whose session no longer exists by comparing Daytona's labelled sandboxes against Pi's live sessions.
 
