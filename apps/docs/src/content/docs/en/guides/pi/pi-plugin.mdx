@@ -79,11 +79,13 @@ The extension is a single Pi extension (`index.ts`, with helpers under `src/`) t
 
 A session flows through it like this:
 
-1. **`session_start`** — create or reattach this session's sandbox and clone its `pi/<id>` branch into it.
-2. **Each tool call** — runs inside the sandbox, never on your host.
-3. **`agent_end`** — push the agent's new commits to the branch.
-4. **Idle / resume** — the sandbox pauses when idle and is reattached when you resume the session.
-5. **Session deleted** — the sandbox is reaped on the next launch or exit.
+1. **Tool registration** — at startup the extension swaps Pi's built-in tools for sandbox-backed ones.
+2. **`session_start`** — create or reattach this session's sandbox and clone its `pi/<id>` branch into it.
+3. **`before_agent_start`** — rewrite the system prompt so the agent targets the sandbox.
+4. **Each tool call** — runs inside the sandbox, never on your host.
+5. **`agent_end`** — push the agent's new commits to the branch.
+6. **Idle / resume** — the sandbox pauses when idle and is reattached when you resume the session.
+7. **Session deleted** — the sandbox is reaped on the next launch or exit.
 
 #### Tool registration
 
@@ -109,24 +111,6 @@ pi.registerTool({
 
 `read`, `write`, `edit`, and `ls` follow the same pattern; `find` and `grep` run a dedicated search inside the sandbox.
 
-#### System prompt
-
-Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
-
-A `before_agent_start` hook rewrites the agent's working-directory line to the sandbox path and tells it to commit (but not push) its work:
-
-```typescript
-pi.on("before_agent_start", (event) => {
-  if (!active) return;
-  const cwdLine = `Current working directory: ${active.cwd} (Daytona sandbox ${shortId(active.sandbox.id)})`;
-  let systemPrompt = event.systemPrompt.replace(/Current working directory: .*/g, cwdLine);
-  systemPrompt +=
-    "\n\nThis project is a git repository inside a Daytona sandbox. After you finish a unit of work, " +
-    'commit it with git. Do not push — pushing is handled automatically.';
-  return { systemPrompt };
-});
-```
-
 #### Lifecycle and reconciliation
 
 Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
@@ -144,6 +128,24 @@ async function reapOrphans(daytona) {
 ```
 
 This runs in the background on `session_start` and again on `session_shutdown`, so deleting a session from Pi's resume menu cleans up its sandbox on the next launch or exit.
+
+#### System prompt
+
+Source: [`index.ts`](https://github.com/daytonaio/daytona/blob/main/libs/pi-plugin/index.ts)
+
+A `before_agent_start` hook rewrites the agent's working-directory line to the sandbox path and tells it to commit (but not push) its work:
+
+```typescript
+pi.on("before_agent_start", (event) => {
+  if (!active) return;
+  const cwdLine = `Current working directory: ${active.cwd} (Daytona sandbox ${shortId(active.sandbox.id)})`;
+  let systemPrompt = event.systemPrompt.replace(/Current working directory: .*/g, cwdLine);
+  systemPrompt +=
+    "\n\nThis project is a git repository inside a Daytona sandbox. After you finish a unit of work, " +
+    'commit it with git. Do not push — pushing is handled automatically.';
+  return { systemPrompt };
+});
+```
 
 #### GitHub branch sync
 
