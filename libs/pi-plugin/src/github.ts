@@ -54,6 +54,11 @@ export function compareUrl(slug: RepoSlug, base: string, branch: string): string
 	return `https://github.com/${slug.owner}/${slug.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}`;
 }
 
+/** URL to a branch's tree (repo root) on GitHub. */
+export function branchUrl(slug: RepoSlug, branch: string): string {
+	return `https://github.com/${slug.owner}/${slug.repo}/tree/${branch}`;
+}
+
 interface GhResult {
 	ok: boolean;
 	stdout: string;

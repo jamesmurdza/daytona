@@ -22,6 +22,7 @@ import { execCommand } from "./src/sandbox.ts";
 import { joinPath, normalizeRepoUrl, repoName, shellQuote, shortId } from "./src/util.ts";
 import {
 	type RepoSlug,
+	branchUrl,
 	compareUrl,
 	createPullRequest,
 	detectLocalRepo,
@@ -108,7 +109,7 @@ export default function (pi: ExtensionAPI) {
 					// status is best-effort
 				}
 				lines.push(`branch: ${git.branch} → ${git.base}${sync}`);
-				lines.push(`pr: ${compareUrl(git.slug, git.base, git.branch)}`);
+				lines.push(`github: ${branchUrl(git.slug, git.branch)}`);
 			} else {
 				lines.push("github sync: off (launch with --repo and `gh auth login`)");
 			}

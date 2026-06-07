@@ -81,7 +81,7 @@ Or run outside a git repo to get a blank workspace.
 
 While Pi is running with `--daytona`, you can manage the active sandbox:
 
-- `/sandbox` — show the active sandbox's status: state, working directory, branch, sync status, and PR link
+- `/sandbox` — show the active sandbox's status: state, working directory, branch, sync status, and its GitHub branch link
 - `/compare` — open this session's branch compare view on GitHub
 - `/merge` — merge this session's branch into its base on GitHub
 - `/pr` — open a GitHub pull request for this session's branch
@@ -103,7 +103,7 @@ If you're in a **github.com** repo and logged in via the GitHub CLI (`gh auth lo
 
 - On start, the extension creates `pi/<short-session-id>` on GitHub (off your current branch, or `--branch`) and clones it into the sandbox over HTTPS.
 - The agent **commits its own work** — it's prompted to commit after making changes, and not to push. After each turn the extension pushes those commits to the branch via the Daytona git API. A branch with nothing new is skipped.
-- `/merge` merges the branch into its base, and `/pr` opens a pull request (the compare/PR link also shows in `/sandbox`).
+- `/merge` merges the branch into its base, and `/pr` opens a pull request.
 - **Forks** start a fresh sandbox and branch off the parent session's branch.
 
 All network git operations (clone/push) run **inside the sandbox** through Daytona; the host only uses `gh` to mint a token and call the GitHub API. A temporary git identity is configured in the sandbox so commits work out of the box.
