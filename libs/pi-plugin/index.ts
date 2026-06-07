@@ -77,32 +77,15 @@ export default function (pi: ExtensionAPI) {
 
 	// --- Informational commands (read-only; don't change the backend) ---
 
+	// Dashboard for the active sandbox: state, working dir, branch, sync status, PR link.
 	pi.registerCommand("sandbox", {
-		description: "Inspect the active Daytona sandbox: status | view",
-		getArgumentCompletions: (prefix) => {
-			const subs = ["status", "view"];
-			const matches = subs.filter((s) => s.startsWith(prefix.trim()));
-			return matches.length > 0 ? matches.map((s) => ({ value: s, label: s })) : null;
-		},
-		handler: async (args, ctx) => {
+		description: "Show a dashboard for the active Daytona sandbox",
+		handler: async (_args, ctx) => {
 			if (!active) {
 				ctx.ui.notify("No Daytona sandbox is active. Launch Pi with --daytona.", "warning");
 				return;
 			}
-			const [sub] = args.trim().split(/\s+/).filter(Boolean);
-			const { sandbox, cwd } = active;
-
-			if (sub === "view") {
-				if (!active.git) {
-					ctx.ui.notify("No GitHub branch for this session. Launch Pi with --repo.", "warning");
-					return;
-				}
-				const { slug, base, branch } = active.git;
-				ctx.ui.notify(`${branch}: ${compareUrl(slug, base, branch)}`, "info");
-				return;
-			}
-
-			// Default subcommand: status.
+			const { sandbox, cwd, git } = active;
 			try {
 				await sandbox.refreshData();
 			} catch {
@@ -110,12 +93,26 @@ export default function (pi: ExtensionAPI) {
 			}
 			const state = sandbox.state ?? "unknown";
 			const visibility = sandbox.public ? "public" : "private";
-			const snapshot = sandbox.snapshot ? ` · ${sandbox.snapshot}` : "";
-			const branch = active.git ? ` · ${active.git.branch}` : "";
-			ctx.ui.notify(
-				`☁ ${shortId(sandbox.id)} · ${state} · ${cwd}${branch}${snapshot} · ${visibility}`,
-				"info",
-			);
+			const lines = [
+				`☁ ${shortId(sandbox.id)} · ${state} · ${visibility}${sandbox.snapshot ? ` · ${sandbox.snapshot}` : ""}`,
+				`cwd: ${cwd}`,
+			];
+			if (git) {
+				let sync = "";
+				try {
+					const st = await sandbox.git.status(cwd);
+					const ahead = st.ahead ?? 0;
+					const dirty = st.fileStatus?.length ?? 0;
+					sync = ` · ${ahead} unpushed${dirty ? `, ${dirty} uncommitted` : ""}`;
+				} catch {
+					// status is best-effort
+				}
+				lines.push(`branch: ${git.branch} → ${git.base}${sync}`);
+				lines.push(`pr: ${compareUrl(git.slug, git.base, git.branch)}`);
+			} else {
+				lines.push("github sync: off (launch with --repo and `gh auth login`)");
+			}
+			ctx.ui.notify(lines.join("\n"), "info");
 		},
 	});
 
