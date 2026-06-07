@@ -82,7 +82,7 @@ A session flows through it like this:
 1. Pi's built-in tools are replaced with sandbox-backed versions, so every tool call runs in the sandbox.
 2. A sandbox is created for the session — or reattached when you resume it — and the repo is cloned in.
 3. The agent's system prompt is pointed at the sandbox.
-4. The agent's commits are pushed to its branch after each turn.
+4. After each turn, the agent's commits are pushed to its branch.
 5. Sandboxes whose session no longer exists are deleted.
 
 #### 1. Tool registration
