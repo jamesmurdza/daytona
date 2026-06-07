@@ -77,9 +77,9 @@ export default function (pi: ExtensionAPI) {
 
 	// --- Informational commands (read-only; don't change the backend) ---
 
-	// Dashboard for the active sandbox: state, working dir, branch, sync status, PR link.
+	// Status for the active sandbox: state, working dir, branch, sync status, PR link.
 	pi.registerCommand("sandbox", {
-		description: "Show a dashboard for the active Daytona sandbox",
+		description: "Show the active Daytona sandbox's status",
 		handler: async (_args, ctx) => {
 			if (!active) {
 				ctx.ui.notify("No Daytona sandbox is active. Launch Pi with --daytona.", "warning");
