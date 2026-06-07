@@ -59,6 +59,11 @@ export function branchUrl(slug: RepoSlug, branch: string): string {
 	return `https://github.com/${slug.owner}/${slug.repo}/tree/${branch}`;
 }
 
+/** URL that opens GitHub's pre-filled "Open a pull request" page (base...branch). */
+export function prUrl(slug: RepoSlug, base: string, branch: string): string {
+	return `${compareUrl(slug, base, branch)}?expand=1`;
+}
+
 interface GhResult {
 	ok: boolean;
 	stdout: string;
@@ -130,32 +135,6 @@ export async function mergeBranch(
 	// 204 (nothing to merge) and "already merged" are not failures.
 	if (/already merged|nothing to merge/i.test(res.stderr)) return { ok: true, message: "already up to date" };
 	return { ok: false, message: res.stderr || "merge failed" };
-}
-
-/** Open a pull request for `head` into `base` via `gh pr create`. Returns the PR URL. */
-export async function createPullRequest(
-	pi: ExtensionAPI,
-	slug: RepoSlug,
-	base: string,
-	head: string,
-): Promise<{ ok: boolean; url?: string; message: string }> {
-	const res = await gh(pi, [
-		"pr",
-		"create",
-		"--repo",
-		`${slug.owner}/${slug.repo}`,
-		"--base",
-		base,
-		"--head",
-		head,
-		"--fill",
-	]);
-	if (res.ok) return { ok: true, url: res.stdout || undefined, message: "opened" };
-	// gh reports an existing PR (and its URL) on stderr.
-	if (/already exists/i.test(res.stderr)) {
-		return { ok: true, url: res.stderr.match(/https?:\/\/\S+/)?.[0], message: "already open" };
-	}
-	return { ok: false, message: res.stderr || "failed to open PR" };
 }
 
 /** Delete a remote branch ref. Best-effort. */

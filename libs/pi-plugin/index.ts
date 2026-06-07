@@ -24,7 +24,6 @@ import {
 	type RepoSlug,
 	branchUrl,
 	compareUrl,
-	createPullRequest,
 	detectLocalRepo,
 	ensureBranch,
 	getBranchSha,
@@ -32,6 +31,7 @@ import {
 	getGithubToken,
 	mergeBranch,
 	parseRepoSlug,
+	prUrl,
 } from "./src/github.ts";
 import { pushChanges } from "./src/sync.ts";
 
@@ -147,28 +147,22 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	// Open a pull request for this session's branch.
+	// Open GitHub's pre-filled "Open a pull request" page for this session's branch.
 	pi.registerCommand("pr", {
-		description: "Open a GitHub pull request for this session's branch",
+		description: "Open a pull request for this session's branch on GitHub",
 		handler: async (_args, ctx) => {
 			if (!active?.git) {
 				ctx.ui.notify("Opening a PR needs a GitHub repo. Launch Pi with --repo.", "warning");
 				return;
 			}
 			const { slug, base, branch } = active.git;
+			const url = prUrl(slug, base, branch);
 			try {
-				// Push the agent's latest commits first so the PR includes them.
-				const token = await getGithubToken(pi);
-				await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: true }, token);
-				const res = await createPullRequest(pi, slug, base, branch);
-				if (!res.ok) {
-					ctx.ui.notify(`Failed to open PR: ${res.message}`, "error");
-					return;
-				}
-				ctx.ui.notify(`Pull request ${res.message}${res.url ? `: ${res.url}` : ""}`, "info");
-			} catch (err) {
-				ctx.ui.notify(`Failed to open PR: ${errorMessage(err)}`, "error");
+				await openUrl(pi, url);
+			} catch {
+				// Couldn't launch a browser — the URL is still shown below.
 			}
+			ctx.ui.notify(`Open PR: ${url}`, "info");
 		},
 	});
 
