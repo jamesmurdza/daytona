@@ -171,6 +171,25 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	// Open this session's branch compare view on GitHub in the browser.
+	pi.registerCommand("compare", {
+		description: "Open this session's branch compare view on GitHub",
+		handler: async (_args, ctx) => {
+			if (!active?.git) {
+				ctx.ui.notify("No GitHub branch for this session. Launch Pi with --repo.", "warning");
+				return;
+			}
+			const { slug, base, branch } = active.git;
+			const url = compareUrl(slug, base, branch);
+			try {
+				await openUrl(pi, url);
+			} catch {
+				// Couldn't launch a browser — the URL is still shown below.
+			}
+			ctx.ui.notify(`Compare: ${url}`, "info");
+		},
+	});
+
 	// --- Lifecycle ---
 
 	pi.on("session_start", async (event, ctx) => {
@@ -454,4 +473,15 @@ function stringFlag(value: boolean | string | undefined): string | undefined {
 
 function errorMessage(err: unknown): string {
 	return err instanceof Error ? err.message : String(err);
+}
+
+/** Open a URL in the host's default browser (best-effort, cross-platform). */
+async function openUrl(pi: ExtensionAPI, url: string): Promise<void> {
+	if (process.platform === "darwin") {
+		await pi.exec("open", [url]);
+	} else if (process.platform === "win32") {
+		await pi.exec("cmd", ["/c", "start", "", url]);
+	} else {
+		await pi.exec("xdg-open", [url]);
+	}
 }
