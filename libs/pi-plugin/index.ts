@@ -363,15 +363,8 @@ export default function (pi: ExtensionAPI) {
 		const current = active;
 		active = null;
 		setStatus(ctx, undefined);
-		// Final push so the agent's last commits land on GitHub before the sandbox pauses.
-		if (current.git) {
-			try {
-				const token = await getGithubToken(pi);
-				await pushChanges({ sandbox: current.sandbox, cwd: current.cwd, pushEnabled: true }, token);
-			} catch {
-				// best-effort final push
-			}
-		}
+		// No push here: agent_end already pushes after each turn, and the sandbox
+		// persists (paused), so any unpushed commits go up on the next turn.
 
 		const persisted = ctx.sessionManager.getSessionFile() !== undefined;
 		if (persisted) {

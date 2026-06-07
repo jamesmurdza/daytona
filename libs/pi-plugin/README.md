@@ -102,7 +102,7 @@ The agent runs on your machine. Pi's tool layer is pluggable, so this extension 
 If you're in a **github.com** repo and logged in via the GitHub CLI (`gh auth login`), each session gets its own branch and the agent's commits are pushed there automatically. The repo comes from `--repo`, or — when you omit it — is **detected from the git project you launched Pi in** (its `origin` and current branch).
 
 - On start, the extension creates `pi/<short-session-id>` on GitHub (off your current branch, or `--branch`) and clones it into the sandbox over HTTPS.
-- The agent **commits its own work** — it's prompted to commit after making changes, and not to push. After each turn (and once more on exit) the extension pushes those commits to the branch via the Daytona git API. A branch with nothing new is skipped.
+- The agent **commits its own work** — it's prompted to commit after making changes, and not to push. After each turn the extension pushes those commits to the branch via the Daytona git API. A branch with nothing new is skipped.
 - `/sandbox view` gives you the compare/PR link; `/sandbox merge` merges the branch into its base.
 - **Forks** start a fresh sandbox and branch off the parent session's branch.
 
