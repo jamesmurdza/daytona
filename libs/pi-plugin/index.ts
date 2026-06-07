@@ -191,6 +191,24 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	// Open this session's branch on GitHub in the browser.
+	pi.registerCommand("github", {
+		description: "Open this session's branch on GitHub",
+		handler: async (_args, ctx) => {
+			if (!active?.git) {
+				ctx.ui.notify("No GitHub branch for this session. Launch Pi with --repo.", "warning");
+				return;
+			}
+			const url = branchUrl(active.git.slug, active.git.branch);
+			try {
+				await openUrl(pi, url);
+			} catch {
+				// Couldn't launch a browser — the URL is still shown below.
+			}
+			ctx.ui.notify(`GitHub: ${url}`, "info");
+		},
+	});
+
 	// --- Lifecycle ---
 
 	pi.on("session_start", async (event, ctx) => {

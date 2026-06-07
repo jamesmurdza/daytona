@@ -82,6 +82,7 @@ Or run outside a git repo to get a blank workspace.
 While Pi is running with `--daytona`, you can manage the active sandbox:
 
 - `/sandbox` — show the active sandbox's status: state, working directory, branch, sync status, and its GitHub branch link
+- `/github` — open this session's branch on GitHub
 - `/compare` — open this session's branch compare view on GitHub
 - `/merge` — merge this session's branch into its base on GitHub
 - `/pr` — open a GitHub pull request for this session's branch
