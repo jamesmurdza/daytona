@@ -109,7 +109,20 @@ pi.registerTool({
 
 #### 2. Session start
 
-On `session_start` the extension creates a sandbox for the session — or reattaches the one it created earlier, so resuming a session restores your work. With a GitHub repo, it also creates the `pi/<id>` branch and clones it into the sandbox.
+On `session_start` the extension reattaches the sandbox it created earlier for this session — so resuming restores your work — or creates a new one:
+
+```typescript
+pi.on("session_start", async (event, ctx) => {
+  const prev = lastSandboxFor(ctx); // recorded in a session entry on first run
+  active = prev
+    ? await daytona.get(prev.sandboxId) // resume → reattach
+    : await daytona.create({
+        labels: { "created-by": "pi-daytona", "session-id": sessionId },
+      }); // new → create
+});
+```
+
+With a GitHub repo, a new sandbox also gets the `pi/<id>` branch created and cloned into it.
 
 #### 3. System prompt
 
