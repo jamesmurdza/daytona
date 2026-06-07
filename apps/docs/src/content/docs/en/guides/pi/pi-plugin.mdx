@@ -83,7 +83,7 @@ A session flows through it like this:
 2. On session start, a sandbox is created for the session — or reattached when you resume it — and the repo is cloned in.
 3. Before the agent starts, the system prompt is pointed at the sandbox.
 4. After each turn, the agent's commits are pushed to its branch.
-5. When you delete a session, its sandbox is reaped.
+5. When you delete a session, its orphaned sandbox is reconciled and removed.
 
 #### 1. Tool registration
 
