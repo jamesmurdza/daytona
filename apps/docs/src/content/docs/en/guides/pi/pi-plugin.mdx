@@ -79,11 +79,11 @@ The extension is a single Pi extension (`index.ts`, with helpers under `src/`) t
 
 A session flows through it like this:
 
-1. Pi's built-in tools are replaced with sandbox-backed versions, so every tool call runs in the sandbox.
-2. A sandbox is created for the session — or reattached when you resume it — and the repo is cloned in.
-3. The agent's system prompt is pointed at the sandbox.
+1. At startup, Pi's built-in tools are replaced with sandbox-backed versions, so every tool call runs in the sandbox.
+2. On session start, a sandbox is created for the session — or reattached when you resume it — and the repo is cloned in.
+3. Before the agent starts, the system prompt is pointed at the sandbox.
 4. After each turn, the agent's commits are pushed to its branch.
-5. Sandboxes whose session no longer exists are deleted.
+5. When you delete a session, its sandbox is reaped.
 
 #### 1. Tool registration
 
