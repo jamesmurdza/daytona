@@ -83,8 +83,7 @@ A session flows through it like this:
 2. A sandbox is created for the session — or reattached when you resume it — and the repo is cloned in.
 3. The agent's system prompt is pointed at the sandbox.
 4. The agent's commits are pushed to its branch after each turn.
-5. The sandbox pauses when idle and restarts when you come back.
-6. Sandboxes whose session no longer exists are deleted.
+5. Sandboxes whose session no longer exists are deleted.
 
 #### 1. Tool registration
 
@@ -147,11 +146,7 @@ pi.on("agent_end", async () => {
 
 When you're not in a github.com repo (or `gh` isn't authenticated), push is disabled — the sandbox still keeps a local git repo so the agent can commit, but nothing is pushed.
 
-#### 5. Idle and resume
-
-The sandbox pauses after a short idle period (its filesystem is preserved) and is transparently restarted on the next tool call or when you resume the session.
-
-#### 6. Reconciliation
+#### 5. Reconciliation
 
 Pi has no "session deleted" event, so the extension reconciles: on `session_start` and `session_shutdown` it reaps any sandbox whose session no longer exists by comparing Daytona's labelled sandboxes against Pi's live sessions.
 
