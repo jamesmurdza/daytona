@@ -73,10 +73,9 @@ While Pi is running with `--daytona`, you can manage the active sandbox:
 
 The extension is a single Pi extension (`index.ts`, with helpers under `src/`) that splits work between your machine and the sandbox:
 
-| On your machine (host)                      | In the sandbox (Linux)                              |
-| ------------------------------------------- | --------------------------------------------------- |
-| The agent — LLM, TUI, sessions              | Every tool call: `bash`, file I/O, `find` / `grep`  |
-| `gh`: mint a token, create/merge the branch | git clone / commit / push (via the Daytona git API) |
+| On your machine (host) | In the sandbox (Linux) |
+| ---------------------- | ---------------------- |
+| <ul><li>The agent — LLM, TUI, sessions</li><li><code>gh</code>: mint a token, create/merge the branch</li></ul> | <ul><li>Every tool call: <code>bash</code>, file I/O, <code>find</code>/<code>grep</code></li><li>git clone / commit / push (via the Daytona git API)</li></ul> |
 
 A session flows through it like this:
 
