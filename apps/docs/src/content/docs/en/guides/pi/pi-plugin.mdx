@@ -3,8 +3,6 @@ title: Run Pi with the Daytona Extension
 description: Use the Daytona Pi extension to run every Pi tool call inside a remote Daytona sandbox, with each session synced to its own GitHub branch.
 ---
 
-import { Image } from 'astro:assets'
-
 import piExtensionGif from '../../../../../assets/docs/images/pi-extension.gif'
 
 This guide demonstrates how to run the [Daytona Pi extension](https://www.npmjs.com/package/@daytona/pi) which integrates Daytona sandboxes and [Pi](https://pi.dev/). When the extension is active, the agent runs on your machine while every tool call — `bash`, file I/O, and search — runs inside a secure Daytona sandbox. Each session gets its own sandbox, and your work is synced to a per-session GitHub branch.
@@ -13,10 +11,10 @@ This guide demonstrates how to run the [Daytona Pi extension](https://www.npmjs.
 
 When you launch Pi with `--daytona`, a sandbox is created for the session and the repo you launched Pi in is cloned into it. From then on, every tool call — running code, installing dependencies, starting servers — happens in the sandbox rather than on your host.
 
-<Image
-  src={piExtensionGif}
+<img
+  src={piExtensionGif.src}
   alt="Pi running with the Daytona extension — sandbox status and a synced GitHub branch"
-  width={600}
+  width="600"
   style="max-width: 100%; height: auto; margin: 1rem 0;"
 />
 
