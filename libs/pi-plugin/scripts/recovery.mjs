@@ -41,11 +41,6 @@ const check = (cond, msg, detail) => {
     console.log(`  ✗ ${msg}${detail ? ` — ${detail}` : ''}`)
   }
 }
-const getText = (r) =>
-  (r?.content ?? [])
-    .filter((c) => c.type === 'text')
-    .map((c) => c.text)
-    .join('\n')
 
 const { createBashOps } = await jiti.import(path.join(root, 'src/ops.ts'))
 
