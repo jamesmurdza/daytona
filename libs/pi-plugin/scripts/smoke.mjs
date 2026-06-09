@@ -43,7 +43,9 @@ if (typeof factory !== "function") {
 	throw new Error("Extension default export is not a function");
 }
 
-factory(stubPi);
+// Await like Pi does: the factory is synchronous today, but Pi awaits the
+// result, so this stays faithful (and robust if it ever becomes async).
+await factory(stubPi);
 
 const expectedFlags = ["daytona", "repo", "branch", "snapshot", "public"];
 const expectedTools = ["bash", "read", "write", "edit", "ls", "find", "grep", "preview_url"];
