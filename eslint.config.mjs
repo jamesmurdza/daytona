@@ -67,11 +67,9 @@ export default [
   },
   {
     // pi-plugin imports the PUBLISHED '@daytona/sdk' (statically in agent code,
-    // dynamically via jiti in scripts/*.mjs); nx would otherwise rewrite those
-    // imports to workspace source. Disabled tree-wide on purpose: pi-plugin is a
-    // standalone published leaf, so the boundary checks lost on SDK-free files
-    // (auth/util/github/smoke) carry no real value here, and a per-file glob
-    // would just be a maintenance tripwire.
+    // dynamically via jiti in scripts/*.mjs), which nx would rewrite to workspace
+    // source. Off tree-wide on purpose — it's a published leaf, so narrowing to
+    // SDK-only files would add maintenance for no real boundary value.
     files: ['libs/pi-plugin/**/*.{ts,tsx,js,jsx,mjs,cjs}'],
     rules: {
       '@nx/enforce-module-boundaries': 'off',
