@@ -66,10 +66,12 @@ export default [
     },
   },
   {
-    // The pi-plugin agent code statically imports '@daytona/sdk', while its
-    // standalone helper scripts (scripts/*.mjs, run in the sandbox via jiti)
-    // dynamically import it. nx flags the static imports as "lazy-loaded";
-    // both import styles are intentional here, so disable the rule.
+    // pi-plugin imports the PUBLISHED '@daytona/sdk' (statically in agent code,
+    // dynamically via jiti in scripts/*.mjs); nx would otherwise rewrite those
+    // imports to workspace source. Disabled tree-wide on purpose: pi-plugin is a
+    // standalone published leaf, so the boundary checks lost on SDK-free files
+    // (auth/util/github/smoke) carry no real value here, and a per-file glob
+    // would just be a maintenance tripwire.
     files: ['libs/pi-plugin/**/*.{ts,tsx,js,jsx,mjs,cjs}'],
     rules: {
       '@nx/enforce-module-boundaries': 'off',
