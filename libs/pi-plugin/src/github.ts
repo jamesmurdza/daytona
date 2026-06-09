@@ -44,10 +44,20 @@ export async function detectLocalRepo(
 
 /** Parse `owner/repo` from a normalized GitHub URL. Undefined if it isn't github.com. */
 export function parseRepoSlug(url: string): RepoSlug | undefined {
-  // `github.com` must be a full host, not a substring: it must be preceded by a
-  // host boundary (`//` in https URLs, `@` in scp-style SSH) so look-alike hosts
-  // like `evilgithub.com` or `subdomain.github.com` are rejected.
-  const m = url.match(/(?:^|[/@])github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i)
+  // Rather than regex-matching the host (which mis-fires on look-alikes like
+  // `evilgithub.com` or `subdomain.github.com`), parse the URL and compare the
+  // hostname exactly. scp-style SSH (`git@github.com:owner/repo`) isn't a valid
+  // URL, so normalize it to `ssh://` first.
+  const scp = url.match(/^(?:([^@/]+)@)?([^/:]+):(.+)$/)
+  const normalized = !url.includes('://') && scp ? `ssh://${scp[2]}/${scp[3]}` : url
+  let parsed: URL
+  try {
+    parsed = new URL(normalized)
+  } catch {
+    return undefined
+  }
+  if (parsed.hostname.toLowerCase() !== 'github.com') return undefined
+  const m = parsed.pathname.match(/^\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/)
   if (!m) return undefined
   return { owner: m[1], repo: m[2] }
 }
