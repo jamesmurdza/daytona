@@ -106,7 +106,8 @@ export function createWriteOps(sandbox: Sandbox): WriteOperations {
       withRecovery(sandbox, () => sandbox.fs.uploadFile(Buffer.from(content, 'utf8'), path)),
     // `mkdir -p` is idempotent; fs.createFolder errors if the folder exists.
     mkdir: async (dir) => {
-      await run(sandbox, `mkdir -p ${shellQuote(dir)}`)
+      const { exitCode } = await run(sandbox, `mkdir -p ${shellQuote(dir)}`)
+      if (exitCode !== 0) throw new Error(`Failed to create directory: ${dir}`)
     },
   }
 }
@@ -139,7 +140,8 @@ export function createLsOps(sandbox: Sandbox): LsOperations {
       return { isDirectory: () => isDir }
     },
     readdir: async (path) => {
-      const { stdout } = await run(sandbox, `ls -1A ${shellQuote(path)}`)
+      const { stdout, exitCode } = await run(sandbox, `ls -1A ${shellQuote(path)}`)
+      if (exitCode !== 0) throw new Error(`Failed to read directory: ${path}`)
       return stdout.split('\n').filter((line) => line.length > 0)
     },
   }
