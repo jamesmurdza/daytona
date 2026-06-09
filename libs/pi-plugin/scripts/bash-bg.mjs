@@ -48,11 +48,26 @@ const sandbox = await daytona.create({ ephemeral: true, labels: { "created-by": 
 try {
 	const home = (await sandbox.getUserHomeDir()) ?? "/home/daytona";
 	const ops = createBashOps(sandbox);
-	const runOps = async (command) => {
+	// Bound every exec with a watchdog: the whole point of this test is that a
+	// backgrounded command must NOT hang ops.exec. Without a timeout a regression
+	// would stall forever (CI hang) instead of failing — so race against a timer
+	// and reject if exec ever blocks past the limit.
+	const runOps = async (command, timeoutMs = 30000) => {
 		let out = "";
 		const started = Date.now();
-		const { exitCode } = await ops.exec(command, home, { onData: (b) => (out += b.toString()) });
-		return { out: out.trim(), exitCode, ms: Date.now() - started };
+		let timer;
+		const watchdog = new Promise((_, reject) => {
+			timer = setTimeout(() => reject(new Error(`ops.exec timed out after ${timeoutMs}ms: ${command}`)), timeoutMs);
+		});
+		try {
+			const { exitCode } = await Promise.race([
+				ops.exec(command, home, { onData: (b) => (out += b.toString()) }),
+				watchdog,
+			]);
+			return { out: out.trim(), exitCode, ms: Date.now() - started };
+		} finally {
+			clearTimeout(timer);
+		}
 	};
 	// Poll instead of a fixed sleep: server startup time varies by sandbox, so
 	// retry the curl until it answers 200 (up to ~9s) rather than guessing.
