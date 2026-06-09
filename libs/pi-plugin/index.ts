@@ -397,8 +397,6 @@ export default function (pi: ExtensionAPI) {
     const current = active
     active = null
     setStatus(ctx, undefined)
-    // No push here: agent_end already pushes after each turn, and the sandbox
-    // persists (paused), so any unpushed commits go up on the next turn.
 
     const persisted = ctx.sessionManager.getSessionFile() !== undefined
     if (persisted) {
