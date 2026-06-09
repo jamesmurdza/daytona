@@ -52,6 +52,17 @@ try {
 		const { exitCode } = await ops.exec(command, home, { onData: (b) => (out += b.toString()) });
 		return { out: out.trim(), exitCode, ms: Date.now() - started };
 	};
+	// Poll instead of a fixed sleep: server startup time varies by sandbox, so
+	// retry the curl until it answers 200 (up to ~9s) rather than guessing.
+	const waitForHttp = async (url) => {
+		let last;
+		for (let i = 0; i < 30; i++) {
+			last = await runOps(`curl -s -o /dev/null -w '%{http_code}' ${url} || echo FAIL`);
+			if (/200/.test(last.out)) return last;
+			await new Promise((r) => setTimeout(r, 300));
+		}
+		return last;
+	};
 
 	console.log("normal commands");
 	const echo = await runOps('echo hello');
@@ -69,15 +80,13 @@ try {
 	const bg = await runOps("python3 -m http.server 8080 &");
 	check(bg.ms < 8000, `did NOT hang (returned in ${bg.ms}ms)`, JSON.stringify(bg));
 	// Server should be alive: curl it from inside the sandbox.
-	await new Promise((r) => setTimeout(r, 800));
-	const curl = await runOps("curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ || echo FAIL");
+	const curl = await waitForHttp("http://localhost:8080/");
 	check(/200/.test(curl.out), "backgrounded server is alive (HTTP 200)", JSON.stringify(curl));
 
 	console.log("background + foreground in one command");
 	const mix = await runOps("python3 -m http.server 8081 & echo started");
 	check(mix.ms < 8000 && /started/.test(mix.out), `mixed bg+fg returns fast with fg output`, JSON.stringify(mix));
-	await new Promise((r) => setTimeout(r, 800));
-	const curl2 = await runOps("curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/ || echo FAIL");
+	const curl2 = await waitForHttp("http://localhost:8081/");
 	check(/200/.test(curl2.out), "second server alive (HTTP 200)", JSON.stringify(curl2));
 } finally {
 	await sandbox.delete().catch(() => {});
