@@ -134,7 +134,11 @@ export function createLsOps(sandbox: Sandbox): LsOperations {
       return exitCode === 0
     },
     stat: async (path) => {
-      const { stdout, exitCode } = await run(sandbox, `test -d ${shellQuote(path)} && echo dir || echo other`)
+      const q = shellQuote(path)
+      // `test -e || exit 1` makes a missing path a real non-zero exit; the
+      // `|| echo other` only masks the `test -d` result, which is fine since
+      // existence is already decided.
+      const { stdout, exitCode } = await run(sandbox, `test -e ${q} || exit 1; test -d ${q} && echo dir || echo other`)
       if (exitCode !== 0) throw new Error(`Path not found: ${path}`)
       const isDir = stdout.trim() === 'dir'
       return { isDirectory: () => isDir }
