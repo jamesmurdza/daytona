@@ -87,10 +87,8 @@ try {
   )
   check(err && /restart pi/i.test(err.message), 'error tells the user how to recover')
 } finally {
-  // Only delete THIS run's sandbox (best-effort — case B may have already
-  // deleted it, hence the .catch). We deliberately don't sweep all
-  // 'pi-daytona-test' sandboxes: that would nuke a concurrent run's sandbox.
-  // autoDeleteInterval on create() is the backstop if this delete doesn't land.
+  // Note: only this run's sandbox — no sweep of all test sandboxes (would hit
+  // concurrent runs); autoDeleteInterval is the backstop.
   await sandbox.delete().catch(() => {})
   console.log('  (cleaned up)')
 }
