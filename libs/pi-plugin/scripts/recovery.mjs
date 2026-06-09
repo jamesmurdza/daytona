@@ -79,9 +79,6 @@ try {
 	check(err && /restart pi/i.test(err.message), "error tells the user how to recover");
 } finally {
 	await sandbox.delete().catch(() => {});
-	for await (const s of daytona.list({ labels: { "created-by": "pi-daytona-test" } })) {
-		await s.delete().catch(() => {});
-	}
 	console.log("  (cleaned up)");
 }
 
