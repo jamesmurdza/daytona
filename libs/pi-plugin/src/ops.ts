@@ -70,6 +70,10 @@ export function createBashOps(sandbox: Sandbox): BashOperations {
     // backgrounded process like `python3 -m http.server 8080 &` returns
     // immediately instead of hanging on the inherited output pipe.
     exec: async (command, cwd, { onData, signal, timeout }) => {
+      // We can only honor a pre-aborted signal: Daytona's executeCommand is a
+      // single blocking call with no cancellation, so once it's running there's
+      // no way to abort mid-flight (racing a timer would just stop awaiting
+      // while the sandbox command keeps running). `timeout` bounds the worst case.
       if (signal?.aborted) throw new Error('aborted')
       // We deliberately do not forward the host `env` into the sandbox: the
       // container has its own environment, and leaking host vars is unsafe.
