@@ -87,9 +87,12 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
   pi.registerTool(sandboxTool(localEdit, (cwd, sb) => createEditTool(cwd, { operations: createEditOps(sb) })))
   pi.registerTool(sandboxTool(localLs, (cwd, sb) => createLsTool(cwd, { operations: createLsOps(sb) })))
 
-  // find and grep can't be redirected via operations: Pi runs fd/ripgrep
-  // locally, and Daytona's searchFiles only does basename matching. So we run
-  // the search inside the sandbox via dedicated tools.
+  // find and grep can't be redirected via operations, for different reasons:
+  //   - grep ALWAYS spawns ripgrep locally with no operations escape hatch, so
+  //     swapping operations can't move the search.
+  //   - find could in principle delegate via FindOperations.glob, but Daytona's
+  //     searchFiles only does basename matching — not the path globs Pi emits.
+  // Either way we run the search inside the sandbox via dedicated tools.
   pi.registerTool({
     ...localFind,
     async execute(id, params, signal, onUpdate) {
