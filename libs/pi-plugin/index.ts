@@ -13,6 +13,7 @@
  * Blueprint: examples/extensions/ssh.ts from @earendil-works/pi-coding-agent.
  */
 
+import * as fs from 'node:fs'
 import { Daytona, type Sandbox } from '@daytona/sdk'
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
@@ -259,19 +260,44 @@ export default function (pi: ExtensionAPI) {
       const snapshot = stringFlag(pi.getFlag('snapshot'))
       const isPublic = pi.getFlag('public') === true
 
-      const sandbox = await dt.create({
-        // Full session id for a globally-unique sandbox name (branches stay short).
-        name: `pi-${sessionId}`,
-        snapshot,
-        public: isPublic,
-        // Idle PAUSES the sandbox (filesystem preserved); the next tool call
-        // transparently restarts it (see withRecovery). Auto-delete is disabled —
-        // the sandbox is reaped only when its session is deleted (see reapOrphans).
-        autoStopInterval: 5, // minutes idle -> stop (pause)
-        autoDeleteInterval: -1, // never auto-delete
-        labels: { 'created-by': 'pi-daytona', 'session-id': sessionId },
-      })
-      created = sandbox
+      let sandbox: Sandbox
+      try {
+        sandbox = await dt.create({
+          // Full session id for a globally-unique sandbox name (branches stay short).
+          name: `pi-${sessionId}`,
+          snapshot,
+          public: isPublic,
+          // Idle PAUSES the sandbox (filesystem preserved); the next tool call
+          // transparently restarts it (see withRecovery). Auto-delete is disabled —
+          // the sandbox is reaped only when its session is deleted (see reapOrphans).
+          autoStopInterval: 5, // minutes idle -> stop (pause)
+          autoDeleteInterval: -1, // never auto-delete
+          labels: { 'created-by': 'pi-daytona', 'session-id': sessionId },
+        })
+        created = sandbox
+      } catch (err) {
+        // Safety net for the resume path: if the session record couldn't be read
+        // (so we fell through to create) but a sandbox with this name already
+        // exists, reattach to it by name rather than failing hard.
+        if (!/already exists/i.test(errorMessage(err))) throw err
+        const existing = await dt.get(`pi-${sessionId}`)
+        await ensureStarted(existing)
+        const prev = latestSessionEntry(ctx)
+        if (!prev) {
+          throw new Error(
+            `A Daytona sandbox named pi-${sessionId} already exists but its session ` +
+              `record is unreadable, so its working directory can't be recovered. ` +
+              `Delete the sandbox (see /sandbox) and relaunch.`,
+          )
+        }
+        active = { sandbox: existing, cwd: prev.cwd, git: prev.git }
+        ctx.ui.notify(
+          `Reattached sandbox · ${shortId(existing.id)}${prev.git ? ` · ${prev.git.branch}` : ''}`,
+          'info',
+        )
+        setRunningStatus(ctx, existing.id, prev.cwd)
+        return
+      }
 
       const home = (await sandbox.getUserHomeDir()) ?? '/home/daytona'
       // Temporary git identity so the agent's commits (and our init commit) just work.
@@ -425,9 +451,42 @@ export default function (pi: ExtensionAPI) {
 
 /** Most recent Daytona sandbox record in this session (for reattach / fork base). */
 function latestSessionEntry(ctx: ExtensionContext): SessionEntryData | undefined {
+  // Disk-first: on pi 0.79 getEntries() is empty at session_start fire time, but
+  // the record is already persisted in the session JSONL — so read it directly,
+  // which is also the only source that recovers the full cwd/git on resume.
+  const file = ctx.sessionManager.getSessionFile()
+  if (file) {
+    try {
+      const found = readEntryFromFile(file)
+      if (found) return found
+    } catch {
+      // Fall through to in-memory entries if the file can't be read/parsed.
+    }
+  }
   const entries = ctx.sessionManager.getEntries()
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i] as { type?: string; customType?: string; data?: unknown }
+    if (e.type === 'custom' && e.customType === SESSION_ENTRY) {
+      return e.data as SessionEntryData
+    }
+  }
+  return undefined
+}
+
+/** Scan a session JSONL file (newest line first) for the last sandbox record. */
+function readEntryFromFile(file: string): SessionEntryData | undefined {
+  const lines = fs.readFileSync(file, 'utf8').split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim()
+    if (!line) continue
+    let e: { type?: string; customType?: string; data?: unknown }
+    try {
+      // Each line is parsed independently so a partial trailing line (the file
+      // may be read mid-write) doesn't abort the scan.
+      e = JSON.parse(line)
+    } catch {
+      continue
+    }
     if (e.type === 'custom' && e.customType === SESSION_ENTRY) {
       return e.data as SessionEntryData
     }
