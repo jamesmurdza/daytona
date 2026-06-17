@@ -63,7 +63,16 @@ function backgroundSafe(command: string): string {
   ].join('\n')
 }
 
-export function createBashOps(sandbox: Sandbox): BashOperations {
+/**
+ * Build bash operations backed by the sandbox.
+ *
+ * `cwdOverride` forces the working directory regardless of what the caller
+ * passes. The agent's bash tool already resolves sandbox-rooted paths, so it
+ * omits this. The user `!` path, however, is invoked by Pi with the HOST cwd
+ * (sessionManager.getCwd()), which doesn't exist in the sandbox — so it passes
+ * the sandbox cwd here to avoid a failed chdir.
+ */
+export function createBashOps(sandbox: Sandbox, cwdOverride?: string): BashOperations {
   return {
     // Daytona's executeCommand is non-streaming, so we emit the whole output
     // once when it resolves. We wrap the command (see backgroundSafe) so a
@@ -77,7 +86,7 @@ export function createBashOps(sandbox: Sandbox): BashOperations {
       if (signal?.aborted) throw new Error('aborted')
       // We deliberately do not forward the host `env` into the sandbox: the
       // container has its own environment, and leaking host vars is unsafe.
-      const res = await execCommand(sandbox, backgroundSafe(command), cwd, timeout)
+      const res = await execCommand(sandbox, backgroundSafe(command), cwdOverride ?? cwd, timeout)
       const output = res.result ?? res.artifacts?.stdout ?? ''
       if (output) onData(Buffer.from(output))
       return { exitCode: res.exitCode ?? null }
