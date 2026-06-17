@@ -13,7 +13,6 @@
  * Blueprint: examples/extensions/ssh.ts from @earendil-works/pi-coding-agent.
  */
 
-import * as fs from 'node:fs'
 import { Daytona, type Sandbox } from '@daytona/sdk'
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
@@ -473,42 +472,13 @@ export default function (pi: ExtensionAPI) {
 
 /** Most recent Daytona sandbox record in this session (for reattach / fork base). */
 function latestSessionEntry(ctx: ExtensionContext): SessionEntryData | undefined {
-  // Disk-first: on pi 0.79 getEntries() is empty at session_start fire time, but
-  // the record is already persisted in the session JSONL — so read it directly,
-  // which is also the only source that recovers the full cwd/git on resume.
-  const file = ctx.sessionManager.getSessionFile()
-  if (file) {
-    try {
-      const found = readEntryFromFile(file)
-      if (found) return found
-    } catch {
-      // Fall through to in-memory entries if the file can't be read/parsed.
-    }
-  }
+  // On resume, pi loads the session file into the SessionManager (synchronously,
+  // in its constructor) before session_start fires, so the persisted record is
+  // already here. The dt.create() collision catch below is the backstop if it
+  // ever isn't.
   const entries = ctx.sessionManager.getEntries()
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i] as { type?: string; customType?: string; data?: unknown }
-    if (e.type === 'custom' && e.customType === SESSION_ENTRY) {
-      return e.data as SessionEntryData
-    }
-  }
-  return undefined
-}
-
-/** Scan a session JSONL file (newest line first) for the last sandbox record. */
-function readEntryFromFile(file: string): SessionEntryData | undefined {
-  const lines = fs.readFileSync(file, 'utf8').split('\n')
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim()
-    if (!line) continue
-    let e: { type?: string; customType?: string; data?: unknown }
-    try {
-      // Each line is parsed independently so a partial trailing line (the file
-      // may be read mid-write) doesn't abort the scan.
-      e = JSON.parse(line)
-    } catch {
-      continue
-    }
     if (e.type === 'custom' && e.customType === SESSION_ENTRY) {
       return e.data as SessionEntryData
     }
