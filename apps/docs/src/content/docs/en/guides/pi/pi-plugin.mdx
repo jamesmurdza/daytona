@@ -98,25 +98,25 @@ A session flows through it like this:
 
 #### 1. Tool registration
 
-Each built-in tool is re-registered so that, when a sandbox is active, it runs against it through the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk). For example, `bash`:
+Each built-in tool is re-registered so that, when a sandbox is active, it runs against it through the [Daytona SDK](https://www.npmjs.com/package/@daytona/sdk). A small `sandboxTool` helper wraps a local tool with a per-call rebuild against the active sandbox:
 
 ```typescript
-pi.registerTool({
-  ...localBash,
-  execute: (id, params, signal, onUpdate) => {
-    const active = getActive();
-    if (active) {
-      const bash = createBashTool(active.cwd, { operations: createBashOps(active.sandbox) });
-      return bash.execute(id, params, signal, onUpdate);
-    }
-    // --daytona set but no sandbox: fail rather than run on the host
-    if (pi.getFlag("daytona") === true) throw new Error("Daytona sandbox is unavailable.");
-    return localBash.execute(id, params, signal, onUpdate); // --daytona off: run locally
-  },
-});
+// Wrap a local tool so it runs against the sandbox (rebuilt per call) when one is active.
+function sandboxTool(local, makeRemote) {
+  return {
+    ...local,
+    execute: (...args) => {
+      const active = requireSandbox(); // throws when --daytona is set but no sandbox; null when off
+      const tool = active ? makeRemote(active.cwd, active.sandbox) : local;
+      return tool.execute(...args);
+    },
+  };
+}
+
+pi.registerTool(sandboxTool(localBash, (cwd, sb) => createBashTool(cwd, { operations: createBashOps(sb) })));
 ```
 
-`read`, `write`, `edit`, and `ls` follow the same pattern; `find` and `grep` run a dedicated search inside the sandbox.
+`read`, `write`, `edit`, and `ls` are registered the same way with their own factories; `find` and `grep` run a dedicated search inside the sandbox.
 
 #### 2. Session start
 
