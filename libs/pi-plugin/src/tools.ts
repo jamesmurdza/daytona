@@ -153,7 +153,10 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
   // host. With --daytona off, return undefined to let Pi run it locally.
   pi.on('user_bash', () => {
     const active = getActive()
-    if (active) return { operations: createBashOps(active.sandbox) }
+    // Pin the shell to /bin/sh: Pi otherwise spawns the host's $SHELL (e.g.
+    // /usr/bin/zsh on macOS) inside the sandbox, where it isn't installed
+    // ("fork/exec /usr/bin/zsh: no such file"). /bin/sh is always present.
+    if (active) return { operations: createBashOps(active.sandbox), shellPath: '/bin/sh' }
     if (pi.getFlag('daytona') === true) {
       return {
         result: {
