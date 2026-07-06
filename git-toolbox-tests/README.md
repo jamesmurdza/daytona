@@ -9,12 +9,12 @@ parsing go-git's message string.
 Each scenario asserts the **desired** behavior, so its check FAILS while the bug
 exists and goes green once it's fixed. `npm test` → 3 failing / 4 (exit 1).
 
-| Behavior | Test |
-|----------|------|
-| 01 — Pushing/cloning to an unreachable host (DNS/TLS/network) fails with a generic 500, not a typed network error | ❌ FAIL |
-| 02 — Pushing a branch that's behind the remote fails with a generic 500, not `409` Conflict | ❌ FAIL |
-| 03 — A push blocked by branch protection or a server-side hook fails with a generic 500, not a classified rejection | ❌ FAIL |
-| 04 — Cloning a missing/private repo returns a typed `401` auth error (control — already fixed) | ✅ PASS |
+| Desired behavior | Actual behavior |
+|------------------|-----------------|
+| 01 — An unreachable host (DNS/TLS/network) surfaces as a typed network error | Generic 500 `DaytonaError` |
+| 02 — Pushing a branch that's behind the remote returns `409` Conflict | Generic 500 |
+| 03 — A push blocked by branch protection or a server-side hook is a classified rejection | Generic 500 |
+| 04 — Cloning a missing/private repo returns a typed `401` auth error | Typed `401` ✓ (already fixed) |
 
 _Last run: 2026-07-06 · `@daytonaio/sdk` 0.193.0._
 

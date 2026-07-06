@@ -8,11 +8,11 @@ where they fall short today.
 Each scenario asserts the **desired** behavior, so its check FAILS while the bug
 exists and goes green once it's fixed. `npm test` → 3 failing / 3 (exit 1).
 
-| Behavior | Test |
-|----------|------|
-| 01 — Re-reading a job's logs after a disconnect returns the whole log from the start, with no way to resume | ❌ FAIL |
-| 02 — A running background job exposes no PID and reports "finished" while it's still running | ❌ FAIL |
-| 03 — deleteSession leaves a detached dev-server/DB/browser process running | ❌ FAIL |
+| Desired behavior | Actual behavior |
+|------------------|-----------------|
+| 01 — Following a job's logs resumes after a disconnect (fetch only new output) | Every read restarts from the beginning |
+| 02 — A running background job exposes a PID / accurate status | No PID; reports "finished" while still running |
+| 03 — deleteSession kills all descendants, including detached processes | Detached dev-server/DB/browser keeps running |
 
 _Last run: 2026-07-06 · `@daytonaio/sdk` 0.193.0._
 
