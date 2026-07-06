@@ -5,8 +5,7 @@ where they fall short today.
 
 ## Scenarios
 
-Each scenario asserts the **desired** behavior, so its check FAILS while the bug
-exists and goes green once it's fixed. `npm test` → 3 failing / 3 (exit 1).
+Each scenario asserts the **desired** behavior:
 
 | # | Desired behavior | Actual behavior |
 |---|------------------|-----------------|
