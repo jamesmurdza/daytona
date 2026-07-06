@@ -8,11 +8,11 @@ where they fall short today.
 Each scenario asserts the **desired** behavior, so its check FAILS while the bug
 exists and goes green once it's fixed. `npm test` → 3 failing / 3 (exit 1).
 
-| # | Scenario | Result | Status |
-|---|----------|--------|--------|
-| 01 | Following a long job's logs from a serverless fn that reconnects | Every read restarts from the beginning — no resume | ❌ FAIL |
-| 02 | Checking whether a background job is still running | No PID; reports "finished" while it's still running | ❌ FAIL |
-| 03 | Cleaning up a session that launched a dev server / DB / browser | The detached process keeps running after delete | ❌ FAIL |
+| Behavior | Test |
+|----------|------|
+| 01 — Re-reading a job's logs after a disconnect returns the whole log from the start, with no way to resume | ❌ FAIL |
+| 02 — A running background job exposes no PID and reports "finished" while it's still running | ❌ FAIL |
+| 03 — deleteSession leaves a detached dev-server/DB/browser process running | ❌ FAIL |
 
 - Docs: https://www.daytona.io/docs/en/process-code-execution/#session-operations
 - Workaround (executeCommand + cgroups + polling): https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-jobs

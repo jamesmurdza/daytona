@@ -9,12 +9,12 @@ parsing go-git's message string.
 Each scenario asserts the **desired** behavior, so its check FAILS while the bug
 exists and goes green once it's fixed. `npm test` → 3 failing / 4 (exit 1).
 
-| # | Scenario | Result | Status |
-|---|----------|--------|--------|
-| 01 | Cloning/pushing when the git host is unreachable (DNS/TLS/network) | Generic 500 — can't tell it's a network issue | ❌ FAIL |
-| 02 | Pushing a branch that's behind the remote (non-fast-forward) | Generic 500, not `409` Conflict | ❌ FAIL |
-| 03 | A push blocked by branch protection or a server-side hook | Generic 500 — can't tell it was rejected | ❌ FAIL |
-| 04 | Cloning a repo that's missing or private (control) | Typed `401` auth error ✓ | ✅ PASS |
+| Behavior | Test |
+|----------|------|
+| 01 — Pushing/cloning to an unreachable host (DNS/TLS/network) fails with a generic 500, not a typed network error | ❌ FAIL |
+| 02 — Pushing a branch that's behind the remote fails with a generic 500, not `409` Conflict | ❌ FAIL |
+| 03 — A push blocked by branch protection or a server-side hook fails with a generic 500, not a classified rejection | ❌ FAIL |
+| 04 — Cloning a missing/private repo returns a typed `401` auth error (control — already fixed) | ✅ PASS |
 
 Auth/missing-repo were classified into 401/404 in May 2026 (daemon PR #4592);
 nothing else was, including non-fast-forward (which looks like a plain bug).
