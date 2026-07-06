@@ -1,4 +1,4 @@
-import { sh, describeError, printError, runStandalone } from './lib.mjs'
+import { sh, describeError, printError, report, runStandalone } from './lib.mjs'
 
 // BULLET / BUG: a non-fast-forward push should map to 409 Conflict, but falls
 // through to 500. classifyGitError checks errors.Is(err, ErrNonFastForwardUpdate),
@@ -51,11 +51,14 @@ export async function test(sandbox) {
   printError('push stale branch to diverged remote ->', err)
 
   const d = describeError(err) || {}
-  const problem = d.statusCode === 500
-  console.log(
-    `  PROBLEM SHOWN: ${problem}  (remote rejected it as non-fast-forward, but the SDK reports ${d.statusCode}, not 409 Conflict)\n`,
+  // Desired: a non-fast-forward rejection should map to 409 Conflict
+  // (classifyGitError lists ErrNonFastForwardUpdate in its 409 bucket).
+  const pass = d.statusCode === 409
+  return report(
+    pass,
+    '409 Conflict (DaytonaConflictError) for a non-fast-forward push',
+    `rejected as non-fast-forward but reported ${d.class}/${d.statusCode} instead of 409`,
   )
-  return problem
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) runStandalone(test)

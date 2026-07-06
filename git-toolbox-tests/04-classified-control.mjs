@@ -1,4 +1,4 @@
-import { describeError, printError, runStandalone } from './lib.mjs'
+import { describeError, printError, report, runStandalone } from './lib.mjs'
 
 // CONTROL (context, not a bug): this shows what the May 2026 change DID fix.
 // Auth and missing-repo failures ARE classified into typed errors with a real
@@ -20,11 +20,14 @@ export async function test(sandbox) {
   printError('clone a nonexistent GitHub repo ->', err)
 
   const d = describeError(err) || {}
-  const classified = [401, 403, 404].includes(d.statusCode) && d.class !== 'DaytonaError'
-  console.log(
-    `  CLASSIFIED: ${classified}  (typed ${d.class} / ${d.statusCode} — contrast with the generic 500s in tests 01-03)\n`,
+  // This SHOULD already pass — it's the case the May 2026 change fixed. It acts
+  // as a regression guard and a contrast to the failing tests 01-03.
+  const pass = [401, 403, 404].includes(d.statusCode) && d.class !== 'DaytonaError'
+  return report(
+    pass,
+    'auth/missing-repo classified into a typed 401/403/404 error',
+    `auth/missing-repo not classified (got ${d.class}/${d.statusCode})`,
   )
-  return classified
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) runStandalone(test)

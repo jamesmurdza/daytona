@@ -4,12 +4,14 @@ Reproducible tests showing that **most `git` failures come back as the same gene
 
 ## Results (last run: 2026-07-06, `@daytonaio/sdk` 0.193.0, live platform)
 
-| # | Test | Expected | Observed | Status |
-|---|------|----------|----------|--------|
-| 01 | network / DNS / TLS failure | generic 500 | `DaytonaError` · 500 · `dial tcp: ... no such host` | ✅ problem shown |
-| 02 | non-fast-forward push | 500 (bug — should be 409) | `DaytonaError` · 500 · `non-fast-forward update: refs/heads/main` | ✅ problem shown |
-| 03 | server-side rejection (pre-receive hook) | generic 500 | `DaytonaError` · 500 · `pre-receive hook declined` | ✅ problem shown |
-| 04 | auth / missing repo (control) | typed 401/404 | `DaytonaAuthenticationError` · 401 | ✅ classified (expected) |
+Each test asserts the **desired** behavior, so it **FAILS while the bug is present** and turns green when Daytona fixes it. The suite exits non-zero today — the failures *are* the demonstrated bugs. `npm test` → **3 failing / 4** (exit 1).
+
+| # | Test | Expected (asserted) | Observed | Status |
+|---|------|---------------------|----------|--------|
+| 01 | network / DNS / TLS failure | a typed/classified error | `DaytonaError` · 500 · `dial tcp: ... no such host` | ❌ FAIL (bug) |
+| 02 | non-fast-forward push | `409` Conflict | `DaytonaError` · 500 · `non-fast-forward update: refs/heads/main` | ❌ FAIL (bug) |
+| 03 | server-side rejection (pre-receive hook) | a classified rejection error | `DaytonaError` · 500 · `pre-receive hook declined` | ❌ FAIL (bug) |
+| 04 | auth / missing repo (control) | typed `401`/`404` | `DaytonaAuthenticationError` · 401 | ✅ PASS (already fixed) |
 
 Reproduce with `npm install && npm test`.
 

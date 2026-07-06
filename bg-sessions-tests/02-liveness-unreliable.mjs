@@ -1,4 +1,4 @@
-import { sleep, lines, runStandalone } from './lib.mjs'
+import { sleep, lines, report, runStandalone } from './lib.mjs'
 
 // BULLET: no reliable way to tell if a process is running. No PID is exposed,
 // and the only status signal is exitCode. This test shows both failures:
@@ -46,12 +46,18 @@ export async function test(sandbox) {
 
   await sandbox.process.deleteSession(sid)
 
-  const noPid = !keys.includes('pid')
+  const hasPid = keys.includes('pid')
   const reportedDone = exit !== undefined && exit !== null
   const stillRunning = after > before
-  const problem = noPid && reportedDone && stillRunning
-  console.log(`  PROBLEM SHOWN: ${problem}  (exitCode says done, work is still running, and there is no PID to check)\n`)
-  return problem
+  const misreported = reportedDone && stillRunning
+  // Desired: a reliable liveness signal — a PID is exposed AND status does not
+  // claim "finished" while the real work is still running.
+  const pass = hasPid && !misreported
+  return report(
+    pass,
+    'a reliable running/finished signal (a PID, or status that tracks the real process)',
+    `no PID exposed${misreported ? '; exitCode reported done while the detached process was still running' : ''}`,
+  )
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) runStandalone(test)

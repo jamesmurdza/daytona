@@ -1,4 +1,4 @@
-import { describeError, printError, runStandalone } from './lib.mjs'
+import { describeError, printError, report, runStandalone } from './lib.mjs'
 
 // BULLET: Network / DNS / TLS failures -> generic 500 DaytonaError.
 // A clone against an unresolvable host fails at the transport layer. go-git's
@@ -17,11 +17,15 @@ export async function test(sandbox) {
   printError('clone https://nonexistent.invalid/x.git ->', err)
 
   const d = describeError(err) || {}
-  const problem = d.statusCode === 500 && d.class === 'DaytonaError'
-  console.log(
-    `  PROBLEM SHOWN: ${problem}  (network failure surfaces as generic 500 DaytonaError; only the message string tells you what happened)\n`,
+  // Desired: a network failure should be a typed/classified error, not an
+  // opaque generic 500 whose only signal is the message string.
+  const isGeneric500 = d.statusCode === 500 && d.class === 'DaytonaError'
+  const pass = !!err && !isGeneric500
+  return report(
+    pass,
+    'a typed/classified error for network failures',
+    `network failure surfaced as generic ${d.class}/${d.statusCode} — only the message string identifies it`,
   )
-  return problem
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) runStandalone(test)

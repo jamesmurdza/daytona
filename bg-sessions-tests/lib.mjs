@@ -14,14 +14,31 @@ export async function lines(sandbox, file) {
   return parseInt(r.out || '0', 10)
 }
 
-// Create a throwaway sandbox, run the test, always clean up.
+// A test asserts the DESIRED behavior. It PASSES only when Daytona behaves
+// correctly; while the bug is present it FAILS (that is how it demonstrates the
+// problem). Returns the pass boolean.
+export function report(pass, expected, failObservation) {
+  if (pass) {
+    console.log(`  RESULT: PASS — ${expected}`)
+  } else {
+    console.log(`  RESULT: FAIL (bug present) — ${failObservation}`)
+    console.log(`          expected: ${expected}`)
+  }
+  console.log('')
+  return pass
+}
+
+// Create a throwaway sandbox, run the test, always clean up. Exits non-zero
+// when the assertion fails, so this behaves like a normal test.
 export async function runStandalone(test) {
   const sandbox = await daytona.create()
   console.log('sandbox:', sandbox.id, '\n')
+  let pass = false
   try {
-    await test(sandbox)
+    pass = await test(sandbox)
   } finally {
     await daytona.delete(sandbox)
-    console.log('\nsandbox deleted')
+    console.log('sandbox deleted')
   }
+  process.exit(pass ? 0 : 1)
 }

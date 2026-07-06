@@ -1,4 +1,4 @@
-import { sleep, sh, lines, runStandalone } from './lib.mjs'
+import { sleep, sh, lines, report, runStandalone } from './lib.mjs'
 
 // BULLET: deleteSession leaks any process that detaches (dev servers, DBs, pm2,
 // headless browsers all setsid + double-fork). deleteSession signals the
@@ -42,9 +42,14 @@ while true; do echo x >> ${hbMain}; sleep 1; done
   const daemonAlive = after.daemon > mid.daemon
   console.log(`  foreground command killed: ${mainDead};  detached daemon still running: ${daemonAlive}`)
 
-  const problem = mainDead && daemonAlive
-  console.log(`  PROBLEM SHOWN: ${problem}  (deleteSession killed the session but leaked the daemon; a cgroup kill would catch it)\n`)
-  return problem
+  // Desired: deleteSession terminates ALL descendants, including a detached
+  // daemon (like a cgroup kill).
+  const pass = !daemonAlive
+  return report(
+    pass,
+    'deleteSession terminates all descendants, including detached processes',
+    'a detached daemon (setsid + reparented to init) survived deleteSession',
+  )
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) runStandalone(test)

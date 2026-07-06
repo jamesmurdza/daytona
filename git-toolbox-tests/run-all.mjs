@@ -4,7 +4,10 @@ import { test as t02 } from './02-non-fast-forward.mjs'
 import { test as t03 } from './03-hook-rejection.mjs'
 import { test as t04 } from './04-classified-control.mjs'
 
-// Reuse one sandbox for all tests (they are independent and use distinct dirs).
+// Each test asserts the DESIRED behavior: it PASSES only if Daytona behaves
+// correctly, and FAILS while the bug is present. So this suite is expected to
+// have failures today — those failures ARE the demonstrated bugs. It turns all
+// green once the issues are fixed.
 const sandbox = await daytona.create()
 console.log('sandbox:', sandbox.id, '\n')
 const results = []
@@ -23,7 +26,9 @@ try {
 }
 
 console.log('=== SUMMARY ===')
-for (const [name, ok] of results) {
-  const label = name.startsWith('04') ? (ok ? 'classified (expected)' : 'NOT classified') : ok ? 'PROBLEM SHOWN' : 'not shown'
-  console.log(`  ${name.padEnd(22)} ${label}`)
+for (const [name, pass] of results) {
+  console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${name}`)
 }
+const failed = results.filter(([, pass]) => !pass).length
+console.log(`\n${failed} failing / ${results.length} total` + (failed ? '  (failures = demonstrated bugs)' : ''))
+process.exit(failed ? 1 : 0)

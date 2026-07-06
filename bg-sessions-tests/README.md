@@ -7,11 +7,13 @@ Reproducible tests for three problems with process/session handling in serverles
 
 ## Results (last run: 2026-07-06, `@daytonaio/sdk` 0.193.0, live platform)
 
-| # | Test | Expected | Observed | Status |
-|---|------|----------|----------|--------|
-| 01 | log streaming has no resume/offset | 2nd read restarts from byte 0 | read #1 = 3 lines, read #2 = 6 lines (re-read from start) | ✅ problem shown |
-| 02 | can't tell if a process is running | no PID; `exitCode` misreports | fields `["id","command","exitCode"]` (no pid); `exitCode: 0` while daemon grew 1→4 | ✅ problem shown |
-| 03 | `deleteSession` leaks detached processes | daemon survives session deletion | daemon `ppid=1` kept running (8→11) after `deleteSession`; foreground died | ✅ problem shown |
+Each test asserts the **desired** behavior, so it **FAILS while the bug is present** and turns green when Daytona fixes it. The suite exits non-zero today — the failures *are* the demonstrated bugs. `npm test` → **3 failing / 3** (exit 1).
+
+| # | Test | Expected (asserted) | Observed | Status |
+|---|------|---------------------|----------|--------|
+| 01 | log streaming resume | reconnect fetches only new output | read #1 = 3 lines, read #2 = 6 lines (re-read from byte 0) | ❌ FAIL (bug) |
+| 02 | reliable liveness check | a PID / accurate running status | no `pid` field; `exitCode: 0` while daemon grew 1→4 | ❌ FAIL (bug) |
+| 03 | `deleteSession` kills all descendants | detached daemon terminated too | daemon `ppid=1` kept running (8→11) after delete | ❌ FAIL (bug) |
 
 Reproduce with `npm install && npm test`.
 

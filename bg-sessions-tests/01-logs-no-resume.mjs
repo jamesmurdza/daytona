@@ -1,4 +1,4 @@
-import { sleep, runStandalone } from './lib.mjs'
+import { sleep, report, runStandalone } from './lib.mjs'
 
 // BULLET: getSessionCommandLogs() can't resume after a disconnect. There is no
 // offset/cursor parameter — the method is (sessionId, commandId[, onStdout,
@@ -34,9 +34,14 @@ export async function test(sandbox) {
 
   await sandbox.process.deleteSession(sid)
 
-  const problem = secondIsFullReread
-  console.log(`  PROBLEM SHOWN: ${problem}  (after a dropped stream you must re-fetch the whole log; there is no resume)\n`)
-  return problem
+  // Desired: logs are resumable — a follow-up read (after a disconnect) returns
+  // only new output, not the whole log from byte 0.
+  const pass = !secondIsFullReread
+  return report(
+    pass,
+    'resumable logs — a reconnect fetches only new output (offset/cursor)',
+    'every read restarts from byte 0; a dropped stream forces re-fetching the whole log',
+  )
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) runStandalone(test)

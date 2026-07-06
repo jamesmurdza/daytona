@@ -1,4 +1,4 @@
-import { sh, describeError, printError, runStandalone } from './lib.mjs'
+import { sh, describeError, printError, report, runStandalone } from './lib.mjs'
 
 // BULLET: remote-side rejections (branch protection, pre-receive hooks,
 // size/quota limits) -> generic 500. Here we reproduce the most portable one:
@@ -40,12 +40,18 @@ export async function test(sandbox) {
   printError('push to repo whose pre-receive hook rejects ->', err)
 
   const d = describeError(err) || {}
-  const problem = !!err && d.statusCode === 500
-  const note = !err
-    ? '  (NOTE: push unexpectedly succeeded — go-git local transport did not run the server hook; see README)'
-    : ''
-  console.log(`  PROBLEM SHOWN: ${problem}${note}\n`)
-  return problem
+  // Desired: a server-side rejection should be a classified error, not an
+  // opaque generic 500. (If no error was thrown at all, the hook didn't run —
+  // that's an environment issue, still not the desired classified rejection.)
+  const isGeneric500 = d.statusCode === 500 && d.class === 'DaytonaError'
+  const pass = !!err && !isGeneric500
+  return report(
+    pass,
+    'a classified rejection error (not a generic 500)',
+    err
+      ? `server-side rejection surfaced as generic ${d.class}/${d.statusCode}`
+      : 'push unexpectedly succeeded — go-git local transport did not run the server hook (see README)',
+  )
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) runStandalone(test)

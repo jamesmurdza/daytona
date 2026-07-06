@@ -3,7 +3,10 @@ import { test as t01 } from './01-logs-no-resume.mjs'
 import { test as t02 } from './02-liveness-unreliable.mjs'
 import { test as t03 } from './03-deletesession-leaks-daemon.mjs'
 
-// Reuse one sandbox for all tests (they are independent and use distinct dirs/sessions).
+// Each test asserts the DESIRED behavior: it PASSES only if Daytona behaves
+// correctly, and FAILS while the bug is present. So this suite is expected to
+// have failures today — those failures ARE the demonstrated bugs. It turns all
+// green once the issues are fixed.
 const sandbox = await daytona.create()
 console.log('sandbox:', sandbox.id, '\n')
 const results = []
@@ -21,6 +24,9 @@ try {
 }
 
 console.log('=== SUMMARY ===')
-for (const [name, ok] of results) {
-  console.log(`  ${name.padEnd(24)} ${ok ? 'PROBLEM SHOWN' : 'not shown'}`)
+for (const [name, pass] of results) {
+  console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${name}`)
 }
+const failed = results.filter(([, pass]) => !pass).length
+console.log(`\n${failed} failing / ${results.length} total` + (failed ? '  (failures = demonstrated bugs)' : ''))
+process.exit(failed ? 1 : 0)
