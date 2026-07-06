@@ -18,7 +18,7 @@ exists and goes green once it's fixed. `npm test` → 3 failing / 4 (exit 1).
 
 _Last run: 2026-07-06 · `@daytonaio/sdk` 0.193.0._
 
-Auth/missing-repo were classified into 401/404 in May 2026 (daemon PR #4592);
+Auth/missing-repo were classified into 401/404 in May 2026 ([daemon PR #4592](https://github.com/daytonaio/daytona/pull/4592));
 nothing else was, including non-fast-forward (which looks like a plain bug).
 
 ## Running
