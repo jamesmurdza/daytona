@@ -1,0 +1,11 @@
+{
+  "name": "daytona-git-toolbox-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node run-all.mjs"
+  },
+  "dependencies": {
+    "@daytonaio/sdk": "^0.193.0"
+  }
+}
