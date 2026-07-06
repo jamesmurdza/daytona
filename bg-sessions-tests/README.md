@@ -10,9 +10,9 @@ exists and goes green once it's fixed. `npm test` → 3 failing / 3 (exit 1).
 
 | # | Desired behavior | Actual behavior |
 |---|------------------|-----------------|
-| 01 | Following a job's logs resumes after a disconnect (fetch only new output) | ❌ Every read restarts from the beginning |
-| 02 | A running background job exposes a PID / accurate status | ❌ No PID; reports "finished" while still running |
-| 03 | deleteSession kills all descendants, including detached processes | ❌ Detached dev-server/DB/browser keeps running |
+| 01 | Following a job's logs resumes after a disconnect (fetch only new output) | ❌ Returns the whole log from the beginning every time |
+| 02 | A running background job exposes a PID / accurate status | ❌ Exposes no PID and reports "finished" while still running |
+| 03 | deleteSession kills all descendants, including detached processes | ❌ Leaves the detached dev-server/DB/browser running |
 
 _Last run: 2026-07-06 · `@daytonaio/sdk` 0.193.0._
 
