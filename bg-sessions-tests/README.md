@@ -66,11 +66,3 @@ AFTER  +5s:           { main: 7, daemon: 11 }
 foreground command killed: true;  detached daemon still running: true
 ```
 `deleteSession` signals the process group and walks the session shell's child tree, but a process that creates a new session **and** reparents to init escapes both — so it keeps running. This is the common case: dev servers, databases, `pm2`, and headless browsers all detach this way. A cgroup-based kill (membership is inherited at fork, unaffected by `setsid`/reparenting) would catch it; this doesn't.
-
-## Summary
-
-| Test | Problem | Result |
-|------|---------|--------|
-| 01 | log streaming has no resume/offset | every read restarts from byte 0 |
-| 02 | can't tell if a process is running | no PID; `exitCode` says done while work runs |
-| 03 | `deleteSession` leaks detached processes | daemon (`ppid=1`) survives session deletion |

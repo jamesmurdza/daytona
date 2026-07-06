@@ -72,12 +72,3 @@ class: DaytonaAuthenticationError   statusCode: 401   errorCode: UNAUTHORIZED
 message: unauthorized: authentication required: Repository not found.
 ```
 (GitHub reports missing repos as "authentication required", so it lands in 401.) This is the "reaching the repo" case that the May 2026 change fixed — contrast with the generic 500s above.
-
-## Summary
-
-| Test | Failure | Result |
-|------|---------|--------|
-| 01 | network / DNS / TLS | generic `500 DaytonaError` |
-| 02 | non-fast-forward push | generic `500` (**should be 409**) |
-| 03 | server-side rejection (hook) | generic `500 DaytonaError` |
-| 04 | auth / missing repo (control) | typed `401` ✓ classified |
