@@ -9,13 +9,11 @@ Reproducible tests for three problems with process/session handling in serverles
 
 Each test asserts the **desired** behavior, so it **FAILS while the bug is present** and turns green when Daytona fixes it. The suite exits non-zero today — the failures *are* the demonstrated bugs. `npm test` → **3 failing / 3** (exit 1).
 
-| # | Test | Observed | Status |
-|---|------|----------|--------|
-| 01 | Can you resume a log stream after a disconnect, or does every read restart from the beginning? | read #1 = 3 lines, read #2 = 6 lines (re-read from byte 0) | ❌ FAIL (bug) |
-| 02 | Can you reliably tell if a process is running (a PID, or accurate status)? | no `pid` field; `exitCode: 0` while daemon grew 1→4 | ❌ FAIL (bug) |
-| 03 | Does `deleteSession` kill all descendants, including a detached daemon? | daemon `ppid=1` kept running (8→11) after delete | ❌ FAIL (bug) |
-
-Reproduce with `npm install && npm test`.
+| # | Test | Result | Status |
+|---|------|--------|--------|
+| 01 | Can you resume a log stream after a disconnect, or does every read restart from the beginning? | Second read re-returns the whole log from the start | ❌ FAIL (bug) |
+| 02 | Can you reliably tell if a process is running (a PID, or accurate status)? | No PID; reports finished while the process still runs | ❌ FAIL (bug) |
+| 03 | Does `deleteSession` kill all descendants, including a detached daemon? | The detached daemon keeps running after delete | ❌ FAIL (bug) |
 
 ## Running
 
@@ -39,7 +37,7 @@ await sleep(3000)
 const b = await sandbox.process.getSessionCommandLogs(sid, cmdId)  // read at t=5.5s
 pass = !b.stdout.startsWith(a.stdout)   // want only-new output; actually b re-includes a from byte 0
 ```
-There is no offset/`since` parameter, so a dropped stream forces re-fetching the whole log.
+The method has no offset/`since` parameter, so every read returns the log from the beginning. In serverless, where the streaming connection drops and resumes on a new invocation, that means re-downloading the entire log each time instead of picking up where you left off.
 
 ### 02 — No reliable way to tell if a process is running
 ```js
@@ -49,6 +47,7 @@ const cmd = await sandbox.process.getSessionCommand(sid, cmdId)
 pass = 'pid' in cmd && cmd.exitCode == null   // want a PID and status that tracks the real process
 // actually: no pid field, and exitCode is 0 ("finished") while the daemon keeps running
 ```
+`getSessionCommand` only ever returns `id` / `command` / `exitCode`, so status can only be inferred from whether an exit code has appeared. But that code is written by the command wrapper on normal exit, so it says nothing about a detached child — or about a process that was killed before it could record one.
 
 ### 03 — `deleteSession` leaks detached processes
 ```js
@@ -57,4 +56,4 @@ await sandbox.process.deleteSession(sid)
 await sleep(5000)
 pass = (await daemonHeartbeatStopped())   // want the daemon dead; actually it keeps running
 ```
-`deleteSession` signals the process group and walks the session shell's child tree, but a daemon that starts a new session **and** reparents to init escapes both. This is the common case — dev servers, databases, `pm2`, headless browsers all detach this way. A cgroup-based kill would catch it; this doesn't.
+`deleteSession` signals the process group and walks the session shell's child tree, but a daemon that starts a new session **and** reparents to init escapes both and survives. This is the common case — dev servers, databases, `pm2`, and headless browsers all detach this way — so cleanup silently leaves processes running that hold ports and memory.
