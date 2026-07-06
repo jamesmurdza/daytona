@@ -32,17 +32,27 @@ Each scenario runs in a throwaway sandbox that's deleted on exit. Node 18+.
 
 ## How each scenario is exercised
 
+### 01 — Unreachable host
+Clone a host that doesn't resolve.
 ```js
-// 01 unreachable host — clone a host that doesn't resolve
 await sandbox.git.clone('https://nonexistent.invalid/x.git', dir)   // want: typed error, not 500
+```
 
-// 02 behind the remote — push a stale branch to a diverged remote
+### 02 — Behind the remote
+Push a stale branch to a remote that has moved ahead.
+```js
 await sandbox.git.push(`${root}/cloneB`)                            // want: 409 Conflict
+```
 
-// 03 blocked push — push to a repo whose pre-receive hook rejects
+### 03 — Blocked push
+Push to a repo whose pre-receive hook rejects it.
+```js
 await sandbox.git.push(`${root}/hookclone`)                         // want: classified, not 500
+```
 
-// 04 control — clone a repo that doesn't exist
+### 04 — Control (missing repo)
+Clone a repo that doesn't exist.
+```js
 await sandbox.git.clone('.../does-not-exist.git', dir)             // gets: typed 401 ✓
 ```
 

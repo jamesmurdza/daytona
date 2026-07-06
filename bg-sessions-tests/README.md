@@ -27,16 +27,23 @@ Each scenario runs in a throwaway sandbox that's deleted on exit. Node 18+.
 
 ## How each scenario is exercised
 
+### 01 — Resume logs
+Read the same command's logs twice, a few seconds apart.
 ```js
-// 01 resume logs — read the same command's logs twice, a few seconds apart
 const a = await sandbox.process.getSessionCommandLogs(sid, cmdId)
 const b = await sandbox.process.getSessionCommandLogs(sid, cmdId)   // want: only new output; gets: whole log again
+```
 
-// 02 is it running — launch a detached daemon, then inspect the command
+### 02 — Is it running?
+Launch a detached daemon, then inspect the command.
+```js
 const cmd = await sandbox.process.getSessionCommand(sid, cmdId)     // want: a PID / accurate status
 // gets: no pid field, exitCode 0 while the daemon keeps running
+```
 
-// 03 cleanup — the command spawned a detached daemon (setsid + double-fork)
+### 03 — Cleanup
+Delete a session whose command spawned a detached daemon (setsid + double-fork).
+```js
 await sandbox.process.deleteSession(sid)                            // want: daemon killed; gets: still running
 ```
 
