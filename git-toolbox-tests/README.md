@@ -19,9 +19,6 @@ exists and goes green once it's fixed. `npm test` → 3 failing / 4 (exit 1).
 Auth/missing-repo were classified into 401/404 in May 2026 (daemon PR #4592);
 nothing else was, including non-fast-forward (which looks like a plain bug).
 
-- Docs: https://www.daytona.io/docs/en/git-operations/
-- Workaround: https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-git
-
 ## Running
 
 ```bash
@@ -46,3 +43,8 @@ await sandbox.git.push(`${root}/hookclone`)                         // want: cla
 // 04 control — clone a repo that doesn't exist
 await sandbox.git.clone('.../does-not-exist.git', dir)             // gets: typed 401 ✓
 ```
+
+## References
+
+- Docs: https://www.daytona.io/docs/en/git-operations/
+- Workaround: https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-git

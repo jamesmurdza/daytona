@@ -14,9 +14,6 @@ exists and goes green once it's fixed. `npm test` → 3 failing / 3 (exit 1).
 | 02 — A running background job exposes no PID and reports "finished" while it's still running | ❌ FAIL |
 | 03 — deleteSession leaves a detached dev-server/DB/browser process running | ❌ FAIL |
 
-- Docs: https://www.daytona.io/docs/en/process-code-execution/#session-operations
-- Workaround (executeCommand + cgroups + polling): https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-jobs
-
 ## Running
 
 ```bash
@@ -40,3 +37,8 @@ const cmd = await sandbox.process.getSessionCommand(sid, cmdId)     // want: a P
 // 03 cleanup — the command spawned a detached daemon (setsid + double-fork)
 await sandbox.process.deleteSession(sid)                            // want: daemon killed; gets: still running
 ```
+
+## References
+
+- Docs: https://www.daytona.io/docs/en/process-code-execution/#session-operations
+- Workaround (executeCommand + cgroups + polling): https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-jobs
