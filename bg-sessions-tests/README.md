@@ -3,7 +3,7 @@
 Common background-process use cases for the SDK in serverless-style usage, and
 where they fall short today.
 
-## Scenarios (2026-07-06, `@daytonaio/sdk` 0.193.0)
+## Scenarios
 
 Each scenario asserts the **desired** behavior, so its check FAILS while the bug
 exists and goes green once it's fixed. `npm test` → 3 failing / 3 (exit 1).
@@ -13,6 +13,8 @@ exists and goes green once it's fixed. `npm test` → 3 failing / 3 (exit 1).
 | 01 — Re-reading a job's logs after a disconnect returns the whole log from the start, with no way to resume | ❌ FAIL |
 | 02 — A running background job exposes no PID and reports "finished" while it's still running | ❌ FAIL |
 | 03 — deleteSession leaves a detached dev-server/DB/browser process running | ❌ FAIL |
+
+_Last run: 2026-07-06 · `@daytonaio/sdk` 0.193.0._
 
 ## Running
 
