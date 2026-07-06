@@ -6,12 +6,12 @@ Reproducible tests showing that **most `git` failures come back as the same gene
 
 Each test asserts the **desired** behavior, so it **FAILS while the bug is present** and turns green when Daytona fixes it. The suite exits non-zero today — the failures *are* the demonstrated bugs. `npm test` → **3 failing / 4** (exit 1).
 
-| # | Test | Expected (asserted) | Observed | Status |
-|---|------|---------------------|----------|--------|
-| 01 | network / DNS / TLS failure | a typed/classified error | `DaytonaError` · 500 · `dial tcp: ... no such host` | ❌ FAIL (bug) |
-| 02 | non-fast-forward push | `409` Conflict | `DaytonaError` · 500 · `non-fast-forward update: refs/heads/main` | ❌ FAIL (bug) |
-| 03 | server-side rejection (pre-receive hook) | a classified rejection error | `DaytonaError` · 500 · `pre-receive hook declined` | ❌ FAIL (bug) |
-| 04 | auth / missing repo (control) | typed `401`/`404` | `DaytonaAuthenticationError` · 401 | ✅ PASS (already fixed) |
+| # | Test | Observed | Status |
+|---|------|----------|--------|
+| 01 | Is a network / DNS / TLS failure a typed error, not a generic 500? | `DaytonaError` · 500 · `dial tcp: ... no such host` | ❌ FAIL (bug) |
+| 02 | Is a non-fast-forward (diverged) push reported as `409` Conflict? | `DaytonaError` · 500 · `non-fast-forward update: refs/heads/main` | ❌ FAIL (bug) |
+| 03 | Is a server-side push rejection (pre-receive hook) a classified error? | `DaytonaError` · 500 · `pre-receive hook declined` | ❌ FAIL (bug) |
+| 04 | Control: are auth / missing-repo failures classified (already fixed)? | `DaytonaAuthenticationError` · 401 | ✅ PASS |
 
 Reproduce with `npm install && npm test`.
 
@@ -36,39 +36,34 @@ Each test creates a throwaway sandbox and deletes it on exit. Node 18+.
 
 ## Test cases
 
-Each test prints the error's `class` / `statusCode` / `errorCode` / `message` and a `PROBLEM SHOWN: true/false` line.
+Each test triggers a failure and asserts the desired classification.
 
-### 01 — Network / DNS / TLS failure → generic 500
-`git.clone` against an unresolvable host. The failure is real but unclassified.
-
-```
-class: DaytonaError   statusCode: 500   errorCode: INTERNAL_SERVER_ERROR
-message: Get "https://nonexistent.invalid/...": dial tcp: lookup nonexistent.invalid ... no such host
-```
-The message tells you it's a network error; the type/status do not. TLS/cert failures behave identically.
-
-### 02 — Non-fast-forward push → generic 500 (should be 409) — **bug**
-Builds a diverged history locally (one bare repo, two clones, divergent commits) and pushes the stale clone.
-
-```
-class: DaytonaError   statusCode: 500   errorCode: INTERNAL_SERVER_ERROR
-message: non-fast-forward update: refs/heads/main
-```
-`classifyGitError` checks `errors.Is(err, go_git.ErrNonFastForwardUpdate)` → `409`, but go-git returns a plain `fmt.Errorf("non-fast-forward update: %s")` on push that doesn't wrap the sentinel, so the check never matches and it falls through to `500`.
-
-### 03 — Server-side rejection (pre-receive hook) → generic 500
-Pushes to a bare repo whose `pre-receive` hook rejects every push. Stands in for the whole rejection family (branch protection, hooks, size/quota limits) — the server rejects after the connection succeeds, and go-git surfaces it unclassified.
-
-```
-class: DaytonaError   statusCode: 500   errorCode: INTERNAL_SERVER_ERROR
-message: command error on refs/heads/main: pre-receive hook declined
+### 01 — Network / DNS / TLS failure
+```js
+// clone from a host that does not resolve
+try { await sandbox.git.clone('https://nonexistent.invalid/x.git', dir) }
+catch (e) { pass = e.statusCode !== 500 }   // want a typed error, not a generic 500
 ```
 
-### 04 — CONTROL: auth / missing-repo → 401/404 (what *is* classified)
-Not a bug — included for contrast. Cloning a nonexistent GitHub repo is classified into a typed error:
+### 02 — Non-fast-forward push (should be 409) — **bug**
+```js
+// origin has advanced; cloneB is on a stale base, so this push is non-fast-forward
+try { await sandbox.git.push(`${root}/cloneB`) }
+catch (e) { pass = e.statusCode === 409 }   // want 409 Conflict; actually 500
+```
 
+### 03 — Server-side rejection (pre-receive hook)
+```js
+// the bare repo's pre-receive hook rejects every push
+try { await sandbox.git.push(`${root}/hookclone`) }
+catch (e) { pass = e.statusCode !== 500 }   // want a classified rejection, not a generic 500
 ```
-class: DaytonaAuthenticationError   statusCode: 401   errorCode: UNAUTHORIZED
-message: unauthorized: authentication required: Repository not found.
+Stands in for the whole rejection family (branch protection, hooks, size/quota limits).
+
+### 04 — CONTROL: auth / missing-repo (what *is* classified)
+```js
+// clone a repo that does not exist
+try { await sandbox.git.clone('https://github.com/daytonaio/does-not-exist.git', dir) }
+catch (e) { pass = e instanceof DaytonaAuthenticationError }   // classified 401 ✓
 ```
-(GitHub reports missing repos as "authentication required", so it lands in 401.) This is the "reaching the repo" case that the May 2026 change fixed — contrast with the generic 500s above.
+Not a bug — included for contrast. This is the "reaching the repo" case the May 2026 change fixed.
