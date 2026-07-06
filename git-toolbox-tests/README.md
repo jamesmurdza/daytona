@@ -57,5 +57,5 @@ await sandbox.git.clone('.../does-not-exist.git', dir)             // gets: type
 
 ## References
 
-- Docs: https://www.daytona.io/docs/en/git-operations/
-- Workaround: https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-git
+- [Daytona git operations docs](https://www.daytona.io/docs/en/git-operations/)
+- [`sandbox-git` — executeCommand-based workaround](https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-git)

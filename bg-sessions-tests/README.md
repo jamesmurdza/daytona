@@ -48,5 +48,5 @@ await sandbox.process.deleteSession(sid)                            // want: dae
 
 ## References
 
-- Docs: https://www.daytona.io/docs/en/process-code-execution/#session-operations
-- Workaround (executeCommand + cgroups + polling): https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-jobs
+- [Daytona process & session operations docs](https://www.daytona.io/docs/en/process-code-execution/#session-operations)
+- [`sandbox-jobs` — executeCommand + cgroups + polling workaround](https://github.com/jamesmurdza/background-agents/tree/main/packages/sandbox-jobs)
