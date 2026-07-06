@@ -2,6 +2,17 @@
 
 Reproducible tests showing that **most `git` failures come back as the same generic `500 DaytonaError`**, so they can't be told apart programmatically — only by parsing go-git's message string.
 
+## Results (last run: 2026-07-06, `@daytonaio/sdk` 0.193.0, live platform)
+
+| # | Test | Expected | Observed | Status |
+|---|------|----------|----------|--------|
+| 01 | network / DNS / TLS failure | generic 500 | `DaytonaError` · 500 · `dial tcp: ... no such host` | ✅ problem shown |
+| 02 | non-fast-forward push | 500 (bug — should be 409) | `DaytonaError` · 500 · `non-fast-forward update: refs/heads/main` | ✅ problem shown |
+| 03 | server-side rejection (pre-receive hook) | generic 500 | `DaytonaError` · 500 · `pre-receive hook declined` | ✅ problem shown |
+| 04 | auth / missing repo (control) | typed 401/404 | `DaytonaAuthenticationError` · 401 | ✅ classified (expected) |
+
+Reproduce with `npm install && npm test`.
+
 Context: auth and missing-repo errors *were* classified into `401`/`404` in a change from **May 2026** (daemon PR #4592). Nothing else was — including a non-fast-forward push, which looks like an outright bug (the code tries to map it to `409` but falls through to `500`).
 
 **Suggestion:** a dedicated `DaytonaGitError` type with structured fields (the operation, a stable `reason` enum, and the raw git output) would solve this more cleanly than trying to map every failure onto an HTTP status.
