@@ -11,10 +11,10 @@ exists and goes green once it's fixed. `npm test` → 3 failing / 4 (exit 1).
 
 | # | Desired behavior | Actual behavior |
 |---|------------------|-----------------|
-| 01 | An unreachable host (DNS/TLS/network) surfaces as a typed network error | Generic 500 `DaytonaError` |
-| 02 | Pushing a branch that's behind the remote returns `409` Conflict | Generic 500 |
-| 03 | A push blocked by branch protection or a server-side hook is a classified rejection | Generic 500 |
-| 04 | Cloning a missing/private repo returns a typed `401` auth error | Typed `401` ✓ (already fixed) |
+| 01 | An unreachable host (DNS/TLS/network) surfaces as a typed network error | ❌ Generic 500 `DaytonaError` |
+| 02 | Pushing a branch that's behind the remote returns `409` Conflict | ❌ Generic 500 |
+| 03 | A push blocked by branch protection or a server-side hook is a classified rejection | ❌ Generic 500 |
+| 04 | Cloning a missing/private repo returns a typed `401` auth error | ✅ Typed `401` (already fixed) |
 
 _Last run: 2026-07-06 · `@daytonaio/sdk` 0.193.0._
 
